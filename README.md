@@ -110,21 +110,13 @@ This is a [Bun](https://bun.com) workspace monorepo.
 ## Getting started
 
 ```bash
-# install JS deps for every workspace
+# install deps for every workspace
 bun install
-
-# install Solidity deps from GitHub (forge-std, OpenZeppelin)
-bun run --filter '@stablecoin-card/contracts' install:deps
+# build contracts and client code
+bun run build
 ```
 
-### Contracts
-
-```bash
-bun run contracts:build     # forge build
-bun run contracts:test      # forge test -vvv  (12 passing)
-```
-
-### Visual demo (no chain needed)
+### Visual demo
 
 ```bash
 bun run demo                # frontend at http://localhost:3000
