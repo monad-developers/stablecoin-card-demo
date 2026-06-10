@@ -1,0 +1,25 @@
+{
+  "name": "@stablecoin-card/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for integrating with stablecoin card settlement accounts (viem)",
+  "type": "module",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./abi": "./src/abi.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "e2e": "bun script/e2e.ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}

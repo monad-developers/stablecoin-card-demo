@@ -1,13 +1,17 @@
 # stablecoin-card-demo
 
 A reference implementation of an **on-chain settlement mechanism for card payments
-backed by stablecoins**, built on **[Monad](https://monad.xyz)**. A cardholder custodies
-stablecoins in a settlement account, grants a card issuer a constrained authorization,
-and the issuer pulls funds at settlement time — mirroring the real
-`POS → acquirer → card network → issuer` flow.
+backed by stablecoins**, built on **[Monad](https://monad.xyz)**. A cardholder keeps
+stablecoins **in their own wallet**, grants a shared **settlement adapter** an
+**allowance** — the same ERC-20 `approve` every wallet already speaks — and the issuer
+settles through that adapter at payment time, mirroring the real
+`POS → acquirer → card network → issuer` flow. There is no custodial account to fund and
+no per-holder permission system: the authorization *is* the allowance, settlement *is* a
+`transferFrom`, and the adapter is deployed **once per strategy** and shared by every
+holder. The holder never gives up control of their money.
 
 **Monad's fast, deterministic finality lets settlement finalize
-inside the card network's settlement window** — turning a multi-day, capital-intensive
+inside the card network's authorization window** — turning a multi-day, capital-intensive
 process into final, irreversible money movement in seconds.
 
 > [!WARNING]
@@ -15,82 +19,73 @@ process into final, irreversible money movement in seconds.
 
 ## Flow
 
-A card transaction normally flows:
+A card transaction reaches the issuer last:
 
 ```
-cardholder → POS terminal → acquirer → card network → issuer
+POS terminal → acquirer → card network → issuer
 ```
 
-The issuer decides whether to approve, then settles. This project models that
-**settlement** step onchain:
+The issuer has to answer the network **yes or no, fast**. Settlement here is a direct
+**debit** — the issuer pulls the holder's stablecoin straight to the acquirer rather than
+fronting credit — so a truthful "yes" means the money has *already* moved and cannot be
+undone. The issuer therefore settles inside the authorization window and waits for that
+settlement to finalize:
 
-1. **Holder** creates/uses a settlement account and **deposits** stablecoins.
-2. **Holder** **authorizes** an issuer (a "spender") with permissions — e.g. a
-   per-day limit and an expiry.
-3. **Holder** uses the card at a POS. The request travels POS → acquirer →
-   network → **issuer**.
-4. **Issuer** checks its authorization and reads the holder's balance, then
-   **settles**: it pulls funds from the holder's account to the acquirer.
-5. **Holder** can **withdraw** un-spent funds at any time.
+1. **Onboarding (once).** The holder keeps stablecoins in their own wallet and `approve`s
+   the strategy's adapter. That standing allowance is the authorization; revoking is
+   `approve(…, 0)`.
+2. **Request.** A swipe travels POS → acquirer → network → **issuer**: *holder H wants N*.
+3. **Settle.** The issuer calls `settle` on the adapter, pulling N from the holder's wallet
+   to the acquirer. The attempt **is** the decision — if it cannot pull (no allowance or not
+   enough balance) it reverts, and the issuer answers **no**.
+4. **Finality.** The issuer tracks the settlement to finality — the `settle` transaction
+   plus the two blocks built on top of it. Once final the movement is irreversible, and the
+   issuer answers **yes**.
+
+The artifact of a "yes" is the **finalized `settle` transaction and its two confirming
+blocks**. This is why it runs on **Monad**: fast, deterministic finality lands the
+settlement inside the authorization window, so the issuer can treat *capture as
+authorization* — no multi-day settlement, no separate hold.
 
 ## One interface, many strategies
 
 The settlement mechanism is built to adapt. New payment assets, yield sources, and
-settlement behaviors can be added over time **without changing how issuers integrate**.
-An issuer builds against the system once and keeps working as the ecosystem grows.
+settlement behaviors can be added over time **without changing how issuers integrate**. An
+issuer builds against the system once and keeps working as the ecosystem grows.
 
-This works by defining a **standardized surface that issuers recognize**. Each
-cardholder gets their **own account contract**, denominated in a single underlying
-asset. However that account custodies funds behind the scenes, it conforms to the same
-settlement-account surface. The issuer only ever depends on this contract; what
-happens behind it is free to evolve.
+Every strategy is an **adapter**: a single contract, deployed once and shared by all
+holders, that implements **balance recognition** and **settle**. Whatever a holder's funds
+are doing behind the scenes, the issuer only ever needs those two things:
 
 ```solidity
-// account identity
-function owner() external view returns (address);
-function asset() external view returns (address);   // the underlying ERC-20
+// balance recognition — spendable value, denominated in the settlement stablecoin
+function spendable(address holder) external view returns (uint256);
 
-// owner operations
-function deposit(uint256 amount) external;
-function withdraw(uint256 amount) external;
-function authorizeSpender(address spender, uint256 dailyLimit, uint64 expiry) external;
-function revokeSpender(address spender) external;
-
-// issuer operation
-function settle(uint256 amount, address recipient, bytes32 paymentRef) external;
-
-// views
-function balanceOf() external view returns (uint256);
-function authorizationOf(address spender) external view returns (Authorization memory);
-function remainingDailyAllowance(address spender) external view returns (uint256);
+// settle — pull `amount`, converting to the stablecoin if needed, and deliver it
+function settle(address holder, uint256 amount, address recipient) external;
 ```
-
-Each **strategy is a separate account contract** that inherits the shared abstract
-`SettlementAccount` (authorization + settlement state, the views above) and adds *how the
-asset is custodied* — its own `deposit`, `withdraw`, `settle`, and `balanceOf`. The
-issuer never has to know which strategy backs an account.
-
-### Accounts and recognition
-
-Accounts are **per-holder contracts** deployed by a `SettlementAccountFactory` using
-`CREATE2`, so an account's address is **deterministic** — derivable from its owner and
-underlying asset before it is even deployed. An issuer recognizes a conforming account by
-computing the expected address from `(owner, asset)` (or reading
-`factory.getAddress(owner, asset)`) and verifying its factory provenance.
 
 ## Strategies
 
-Each strategy is a concrete account contract extending the abstract `SettlementAccount`.
+Each strategy describes *what the holder holds* and *how `settle` turns it into the
+stablecoin* — all behind the same `spendable` + `settle` surface.
 
-| Strategy | Contract | What it does | Status |
+| Strategy | Holder holds | What it does | Status |
 | --- | --- | --- | --- |
-| **Stablecoin** | `StablecoinAccount.sol` | Custodies the underlying ERC-20 directly — a 1:1 spendable balance. | ✅ Live |
-| **Money market** | — | Deploys idle balance into a money market so it earns yield while remaining spendable. | 🚧 Coming soon |
-| **Swap** | — | Settles in a different asset than the one held, swapping at settlement time. | 🚧 Coming soon |
+| **Stablecoin** | the stablecoin itself | `transferFrom` straight to the issuer. | ✅ Reference |
+| **Money market** | yield-bearing shares (ERC-4626 / aToken) | pull shares, redeem to the underlying stablecoin, deliver it — funds earn yield until the instant of settlement. | 🚧 Planned |
+| **Swap** | a different asset | pull the asset, swap it to the stablecoin at settlement time, deliver it. | 🚧 Planned |
 
-Adding a strategy means writing one new account contract that implements `deposit`,
-`withdraw`, `settle`, and `balanceOf` for its custody model — the surface issuers
-integrate against does not change.
+## Authorization model
+
+Today the authorization is a plain ERC-20 allowance granted to the strategy's adapter:
+simple, universally supported, and non-custodial. It intentionally does **not** carry the
+per-day limit or expiry that the old custodial account enforced on-chain; that risk logic
+lives with the issuer, as it does in the real card network.
+
+> **Future consideration:** [Permit2](https://github.com/Uniswap/permit2) can layer expiry
+> and signature-based (gasless) approvals on top of this model, and is the natural place to
+> re-introduce on-chain spend limits if they are wanted later.
 
 ## Repository layout
 
@@ -98,9 +93,9 @@ This is a [Bun](https://bun.com) workspace monorepo.
 
 | Path | Package | Responsibility |
 | --- | --- | --- |
-| `packages/contracts` | `@stablecoin-card/contracts` | **Source of truth.** Solidity + Foundry. Abstract `SettlementAccount` (shared authorization + settlement state), `StablecoinAccount` strategy, `SettlementAccountFactory`, and demo mocks. |
-| `packages/sdk` | `@stablecoin-card/sdk` | **Integration layer.** Typesafe [viem](https://viem.sh) clients (`SettlementFactoryClient`, `SettlementAccountClient`) + ABIs for any TS consumer. |
-| `apps/demo` | `@stablecoin-card/demo` | **The demo.** React + Tailwind frontend on `Bun.serve` (visual, in-browser simulation) **plus** a notebook-style script (`script/notebook.ts`) that exercises the real contracts via the SDK against a local `anvil` node. |
+| `packages/contracts` | `@stablecoin-card/contracts` | **Source of truth.** Solidity + Foundry. The `spendable` + `settle` adapter interface, the no-op stablecoin adapter, and (planned) money-market and swap adapters, plus demo mocks. |
+| `packages/sdk` | `@stablecoin-card/sdk` | **Integration layer.** Typesafe [viem](https://viem.sh) actions for approving an allowance, reading spendable balance, settling, and tracking a settlement to finality — for any TS consumer. |
+| `apps/demo` | `@stablecoin-card/demo` | **The demo.** Bun + React shell **plus** a notebook-style script (`script/notebook.ts`) that exercises the real contracts via the SDK against a local `anvil` node. |
 
 ## Prerequisites
 
@@ -116,23 +111,26 @@ bun install
 bun run build
 ```
 
-### Visual demo
+### Frontend shell
 
 ```bash
-bun run demo                # frontend at http://localhost:3000
+bun run demo                # React shell at http://localhost:3000
 ```
 
 ## Usage
 
+The notebook walks through the issuer settlement flow end-to-end and deploys a mock USDC +
+adapter itself, so you only need a running node.
+
 ```bash
-# 1. start a local node
-bun run chain               # anvil
+# 1. start a local node that produces blocks continuously (so settlement can finalize)
+bun run chain               # anvil --block-time 1
 
-# 2. deploy the stablecoin strategy + mock USDC (prints the addresses)
-bun run --filter '@stablecoin-card/contracts' deploy:local
+# 2. walk through the issuer settlement flow
+bun run notebook
 
-# 3. run the notebook with the factory address (it mints + funds itself)
-FACTORY_ADDRESS=0x... bun run notebook
+# or run the SDK end-to-end smoke test
+bun run e2e
 ```
 
 ## License

@@ -1,0 +1,16 @@
+{
+  "name": "@stablecoin-card/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "forge build",
+    "test": "forge test -vvv",
+    "fmt": "forge fmt",
+    "snapshot": "forge snapshot",
+    "deploy:local": "forge script script/Deploy.s.sol --rpc-url http://127.0.0.1:8545 --broadcast"
+  },
+  "dependencies": {
+    "forge-std": "github:foundry-rs/forge-std#620536f",
+    "solmate": "github:transmissions11/solmate#89365b8"
+  }
+}

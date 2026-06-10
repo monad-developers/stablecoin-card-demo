@@ -1,0 +1,17 @@
+[profile.default]
+src = "src"
+solc_version = "0.8.24"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 200
+remappings = [
+    "forge-std/=node_modules/forge-std/src/",
+    "solmate/=node_modules/solmate/src/"
+]
+
+[fmt]
+line_length = 100
+tab_width = 4
+bracket_spacing = true
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md

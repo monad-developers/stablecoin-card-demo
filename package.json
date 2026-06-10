@@ -1,0 +1,24 @@
+{
+  "name": "stablecoin-card-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "bun run --filter '*' build",
+    "test": "bun run --filter '*' test",
+    "contracts:build": "bun run --filter '@stablecoin-card/contracts' build",
+    "contracts:test": "bun run --filter '@stablecoin-card/contracts' test",
+    "sdk:build": "bun run --filter '@stablecoin-card/sdk' build",
+    "demo": "bun run --filter '@stablecoin-card/demo' dev",
+    "notebook": "bun run --filter '@stablecoin-card/demo' notebook",
+    "e2e": "bun run --filter '@stablecoin-card/sdk' e2e"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5"
+  }
+}
