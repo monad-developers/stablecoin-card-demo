@@ -22,13 +22,6 @@ export const settlementAdapterAbi = [
   },
   {
     type: "function",
-    name: "asset",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-  {
-    type: "function",
     name: "spendable",
     stateMutability: "view",
     inputs: [{ name: "holder", type: "address" }],

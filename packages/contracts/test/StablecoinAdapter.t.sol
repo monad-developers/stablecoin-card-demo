@@ -33,7 +33,6 @@ contract StablecoinAdapterTest is Test {
     function test_AdapterConfig() public view {
         assertEq(adapter.issuer(), issuer);
         assertEq(adapter.stablecoin(), address(usdc));
-        assertEq(adapter.asset(), address(usdc));
     }
 
     /*//////////////////// SPENDABLE (BALANCE RECOGNITION) ////////////////////*/

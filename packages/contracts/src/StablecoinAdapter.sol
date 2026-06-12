@@ -9,7 +9,7 @@ import { ISettlementAdapter } from "./ISettlementAdapter.sol";
 /// @title StablecoinAdapter
 /// @notice 1:1 pass-through strategy — the holder holds the settlement stablecoin itself.
 /// @dev `settle` pulls the stablecoin straight from the holder to the recipient; the adapter
-///      never takes custody, even momentarily. `asset()` equals `stablecoin()`.
+///      never takes custody, even momentarily.
 contract StablecoinAdapter is ISettlementAdapter {
     using SafeTransferLib for ERC20;
 
@@ -24,11 +24,6 @@ contract StablecoinAdapter is ISettlementAdapter {
     constructor(address issuer_, address stablecoin_) {
         issuer = issuer_;
         stablecoin = stablecoin_;
-    }
-
-    /// @inheritdoc ISettlementAdapter
-    function asset() external view override returns (address) {
-        return stablecoin;
     }
 
     /// @inheritdoc ISettlementAdapter
