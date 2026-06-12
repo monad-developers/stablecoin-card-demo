@@ -4,22 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --hot src/server.ts",
-    "start": "bun src/server.ts",
-    "build": "bun build.ts",
+    "setup": "bun script/setup.ts",
     "notebook": "bun script/notebook.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@stablecoin-card/sdk": "workspace:*",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
     "viem": "^2.21.0"
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
     "typescript": "^5"
   }
 }
