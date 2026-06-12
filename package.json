@@ -13,7 +13,7 @@
     "contracts:build": "bun run --filter '@stablecoin-card/contracts' build",
     "contracts:test": "bun run --filter '@stablecoin-card/contracts' test",
     "sdk:build": "bun run --filter '@stablecoin-card/sdk' build",
-    "demo": "bun run --filter '@stablecoin-card/demo' dev",
+    "demo": "bun run --filter '@stablecoin-card/demo' notebook",
     "notebook": "bun run --filter '@stablecoin-card/demo' notebook",
     "e2e": "bun run --filter '@stablecoin-card/sdk' e2e"
   },
