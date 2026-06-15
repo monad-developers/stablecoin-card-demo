@@ -2,6 +2,11 @@ export { approveSpender, type ApproveSpenderParameters } from "./actions/approve
 export { readSpendable, type ReadSpendableParameters } from "./actions/readSpendable";
 export { settle, type SettleParameters } from "./actions/settle";
 export {
+  settleBatch,
+  type BatchSettlement,
+  type SettleBatchParameters,
+} from "./actions/settleBatch";
+export {
   waitForFinality,
   type FinalityBlocks,
 } from "./actions/waitForFinality";

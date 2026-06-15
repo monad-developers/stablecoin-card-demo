@@ -1,17 +1,3 @@
-/**
- * Notebook-style walkthrough of the issuer's card-settlement flow.
- *
- * This script runs against contracts already deployed by `bun run setup`. It reads
- * the strategy, actors, token metadata, and request amount from apps/demo/.env.
- *
- * Prerequisites:
- *   1. Start a node:         anvil --block-time 1
- *   2. Build contracts:      bun run build      (or: forge build)
- *   3. Deploy demo mocks:    bun run setup
- *   4. Put the printed DEMO_*_ADDRESS values in apps/demo/.env
- *   5. Run the notebook:     bun run notebook
- */
-
 import {
   type Address,
   type Hex,
@@ -23,7 +9,6 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
-
 import {
   approveSpender,
   readSpendable,
@@ -38,7 +23,7 @@ const SETTLEMENT_AMOUNT = "42.50";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name} in apps/demo/.env`);
+  if (!value) throw new Error(`Missing ${name} in apps/stablecoin/.env`);
   return value;
 }
 
@@ -55,7 +40,7 @@ function envPrivateKey(name: string): Hex {
 }
 
 async function cell(title: string, fn: () => Promise<void>): Promise<void> {
-  console.log(`\n${"─".repeat(64)}\n▶ ${title}\n${"─".repeat(64)}`);
+  console.log(`\n${"-".repeat(64)}\n> ${title}\n${"-".repeat(64)}`);
   await fn();
 }
 
@@ -67,7 +52,7 @@ const acquirer = envAddress("DEMO_ACQUIRER_ADDRESS");
 const stablecoin = envAddress("DEMO_STABLECOIN_ADDRESS");
 const strategy: Strategy = {
   adapter: envAddress("DEMO_ADAPTER_ADDRESS"),
-  asset: (process.env.DEMO_ASSET_ADDRESS ? envAddress("DEMO_ASSET_ADDRESS") : stablecoin),
+  asset: process.env.DEMO_ASSET_ADDRESS ? envAddress("DEMO_ASSET_ADDRESS") : stablecoin,
   stablecoin,
 };
 
@@ -82,7 +67,7 @@ const issuerClient = createWalletClient({ account: issuer, chain: foundry, trans
 async function main(): Promise<void> {
   await publicClient.getChainId();
 
-  await cell("Cell 0 · Onboarding: the holder approves the configured adapter", async () => {
+  await cell("Cell 0 - Holder approves the configured adapter", async () => {
     console.log(`stablecoin ${strategy.stablecoin}`);
     console.log(`adapter   ${strategy.adapter} (issuer ${issuer.address})`);
 
@@ -96,15 +81,15 @@ async function main(): Promise<void> {
     acquirer,
   };
 
-  await cell("Cell 1 · A card request reaches the issuer", async () => {
+  await cell("Cell 1 - A card request reaches the issuer", async () => {
     console.log(
-      `network → issuer: holder ${request.holder} wants ${formatUnits(request.amount, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`,
+      `network -> issuer: holder ${request.holder} wants ${formatUnits(request.amount, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`,
     );
     const spendable = await readSpendable(publicClient, { strategy, holder: request.holder });
     console.log(`recognized spendable: ${formatUnits(spendable, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`);
   });
 
-  await cell("Cell 2 · Issuer settles in the window and waits for finality", async () => {
+  await cell("Cell 2 - Issuer settles in the window and waits for finality", async () => {
     const startedAt = Date.now();
 
     const receipt = await settle(issuerClient, {
@@ -117,15 +102,15 @@ async function main(): Promise<void> {
     const finalizedBlocks = await waitForFinality(publicClient, receipt);
     const elapsedMs = Date.now() - startedAt;
 
-    console.log(`\n✅ APPROVED — settlement finalized in ${elapsedMs}ms`);
+    console.log(`\nAPPROVED - settlement finalized in ${elapsedMs}ms`);
     console.log(`   settle tx:         ${receipt.transactionHash} (block ${receipt.blockNumber})`);
     console.log(`   confirming blocks: ${finalizedBlocks.map((b) => b.number).join(", ")}`);
     console.log(
-      `   delivered:         ${formatUnits(request.amount, TOKEN_DECIMALS)} ${TOKEN_SYMBOL} → acquirer ${request.acquirer}`,
+      `   delivered:         ${formatUnits(request.amount, TOKEN_DECIMALS)} ${TOKEN_SYMBOL} -> acquirer ${request.acquirer}`,
     );
   });
 
-  console.log("\nThe issuer's \"yes\" is backed by a finalized, irreversible settlement.");
+  console.log("\nThe issuer's yes is backed by a finalized, irreversible settlement.");
 }
 
 main().catch((err) => {

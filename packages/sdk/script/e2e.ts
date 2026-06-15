@@ -7,9 +7,9 @@
  * plus that the issuer gate holds.
  *
  * Prerequisites:
- *   1. Build the contracts so the artifacts exist:  bun run build   (or: forge build)
- *   2. Start a node:                                 bun run chain   (anvil)
- *   3. Run this script:                              bun run e2e
+ *   1. Build the contracts so the artifacts exist:  bun run --filter '@stablecoin-card/contracts' build
+ *   2. Start a node:                                 anvil --block-time 0.4
+ *   3. Run this script:                              bun run --filter '@stablecoin-card/sdk' e2e
  */
 
 import {

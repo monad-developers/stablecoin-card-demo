@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import { Test } from "forge-std/Test.sol";
 
+import { ISettlementAdapter } from "../src/ISettlementAdapter.sol";
 import { StablecoinAdapter } from "../src/StablecoinAdapter.sol";
 import { MockERC20 } from "../src/mocks/MockERC20.sol";
 
@@ -13,8 +14,10 @@ contract StablecoinAdapterTest is Test {
     MockERC20 internal usdc;
 
     address internal holder = makeAddr("holder");
+    address internal holder2 = makeAddr("holder2");
     address internal issuer = makeAddr("issuer");
     address internal acquirer = makeAddr("acquirer");
+    address internal acquirer2 = makeAddr("acquirer2");
 
     uint256 internal constant UNIT = 1e6; // 6-decimal stablecoin
 
@@ -25,6 +28,10 @@ contract StablecoinAdapterTest is Test {
         // Holder keeps custody in their own wallet and approves the shared adapter.
         usdc.mint(holder, 10_000 * UNIT);
         vm.prank(holder);
+        usdc.approve(address(adapter), type(uint256).max);
+
+        usdc.mint(holder2, 5_000 * UNIT);
+        vm.prank(holder2);
         usdc.approve(address(adapter), type(uint256).max);
     }
 
@@ -65,6 +72,53 @@ contract StablecoinAdapterTest is Test {
 
         assertEq(usdc.balanceOf(acquirer), 120 * UNIT);
         assertEq(usdc.balanceOf(holder), 9_880 * UNIT);
+    }
+
+    function test_FullCardFlow_SettleBatch() public {
+        ISettlementAdapter.Settlement[] memory settlements = new ISettlementAdapter.Settlement[](2);
+        settlements[0] = ISettlementAdapter.Settlement(holder, 120 * UNIT, acquirer);
+        settlements[1] = ISettlementAdapter.Settlement(holder2, 75 * UNIT, acquirer2);
+
+        vm.expectEmit(true, false, false, true);
+        emit Settled(holder, acquirer, 120 * UNIT);
+        vm.expectEmit(true, false, false, true);
+        emit Settled(holder2, acquirer2, 75 * UNIT);
+
+        vm.prank(issuer);
+        adapter.settleBatch(settlements);
+
+        assertEq(usdc.balanceOf(acquirer), 120 * UNIT);
+        assertEq(usdc.balanceOf(acquirer2), 75 * UNIT);
+        assertEq(usdc.balanceOf(holder), 9_880 * UNIT);
+        assertEq(usdc.balanceOf(holder2), 4_925 * UNIT);
+    }
+
+    function test_RevertWhen_BatchCallerNotIssuer() public {
+        ISettlementAdapter.Settlement[] memory settlements = new ISettlementAdapter.Settlement[](1);
+        settlements[0] = ISettlementAdapter.Settlement(holder, 10 * UNIT, acquirer);
+
+        vm.prank(acquirer);
+        vm.expectRevert(StablecoinAdapter.NotIssuer.selector);
+        adapter.settleBatch(settlements);
+    }
+
+    function test_RevertWhen_BatchAmountExceedsSpendable() public {
+        ISettlementAdapter.Settlement[] memory settlements = new ISettlementAdapter.Settlement[](2);
+        settlements[0] = ISettlementAdapter.Settlement(holder, 120 * UNIT, acquirer);
+        settlements[1] = ISettlementAdapter.Settlement(holder2, 5_001 * UNIT, acquirer2);
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                StablecoinAdapter.InsufficientSpendable.selector, 5_001 * UNIT, 5_000 * UNIT
+            )
+        );
+        adapter.settleBatch(settlements);
+
+        assertEq(usdc.balanceOf(acquirer), 0);
+        assertEq(usdc.balanceOf(acquirer2), 0);
+        assertEq(usdc.balanceOf(holder), 10_000 * UNIT);
+        assertEq(usdc.balanceOf(holder2), 5_000 * UNIT);
     }
 
     function test_FundsStayLiquidUntilSettlement() public {

@@ -6,6 +6,7 @@
   "files": [],
   "references": [
     { "path": "./packages/sdk" },
-    { "path": "./apps/demo" }
+    { "path": "./apps/stablecoin" },
+    { "path": "./apps/money-market" }
   ]
 }

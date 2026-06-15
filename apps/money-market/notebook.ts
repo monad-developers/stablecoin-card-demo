@@ -1,17 +1,3 @@
-/**
- * Notebook-style walkthrough of the money-market settlement flow.
- *
- * This script runs against contracts already deployed by `bun script/setup-money-market.ts`.
- * It reads actors and money-market strategy addresses from apps/demo/.env.
- *
- * Prerequisites:
- *   1. Start a node:                 anvil --block-time 1
- *   2. Build contracts:              bun run build      (or: forge build)
- *   3. Deploy money-market mocks:     bun script/setup-money-market.ts
- *   4. Put the printed DEMO_MM_* values in apps/demo/.env
- *   5. Run the notebook:             bun script/notebook-money-market.ts
- */
-
 import {
   type Address,
   type Hex,
@@ -23,7 +9,6 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { foundry } from "viem/chains";
-
 import {
   approveSpender,
   erc20Abi,
@@ -40,7 +25,7 @@ const SETTLEMENT_AMOUNT = "101.00";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name} in apps/demo/.env`);
+  if (!value) throw new Error(`Missing ${name} in apps/money-market/.env`);
   return value;
 }
 

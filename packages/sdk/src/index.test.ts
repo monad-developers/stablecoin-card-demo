@@ -6,6 +6,7 @@ import {
   erc20Abi,
   readSpendable,
   settle,
+  settleBatch,
   settlementAdapterAbi,
   waitForFinality,
 } from "./index";
@@ -14,7 +15,7 @@ test("adapter ABI exposes the issuer-facing surface", () => {
   const fns: string[] = settlementAdapterAbi
     .filter((e) => e.type === "function")
     .map((e) => e.name);
-  for (const name of ["issuer", "stablecoin", "asset", "spendable", "settle"]) {
+  for (const name of ["issuer", "stablecoin", "spendable", "settle", "settleBatch"]) {
     expect(fns).toContain(name);
   }
 });
@@ -28,6 +29,21 @@ test("settle takes (holder, amount, recipient)", () => {
   expect(inputs).toEqual(["holder", "amount", "recipient"]);
 });
 
+test("settleBatch takes an array of settlement tuples", () => {
+  const fn = settlementAdapterAbi.find(
+    (e): e is Extract<typeof e, { name: "settleBatch" }> =>
+      e.type === "function" && e.name === "settleBatch",
+  );
+  const input = fn?.inputs[0];
+  expect(input?.name).toBe("settlements");
+  expect(input?.type).toBe("tuple[]");
+  expect(input && "components" in input ? input.components.map((i) => i.name) : []).toEqual([
+    "holder",
+    "amount",
+    "recipient",
+  ]);
+});
+
 test("erc20 ABI includes approve + balanceOf", () => {
   const fns: string[] = erc20Abi.filter((e) => e.type === "function").map((e) => e.name);
   expect(fns).toContain("approve");
@@ -38,6 +54,7 @@ test("the actions are exported as functions", () => {
   expect(typeof approveSpender).toBe("function");
   expect(typeof readSpendable).toBe("function");
   expect(typeof settle).toBe("function");
+  expect(typeof settleBatch).toBe("function");
   expect(typeof waitForFinality).toBe("function");
 });
 

@@ -1,12 +1,11 @@
 {
-  "name": "@stablecoin-card/demo",
+  "name": "@stablecoin-card/money-market",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "setup": "bun script/setup.ts",
-    "notebook": "bun script/notebook.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "bun run typecheck"
   },
   "dependencies": {
     "@stablecoin-card/sdk": "workspace:*",

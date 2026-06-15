@@ -13,16 +13,15 @@ import { foundry } from "viem/chains";
 
 import { erc20Abi } from "@stablecoin-card/sdk";
 
-const ARTIFACTS = `${import.meta.dir}/../../../packages/contracts/out`;
+const ARTIFACTS = `${import.meta.dir}/../../packages/contracts/out`;
 const TOKEN_NAME = "USD Coin";
 const TOKEN_SYMBOL = "USDC";
 const TOKEN_DECIMALS = 18;
-const INITIAL_DEPOSIT = "10000";
-const YIELD_RESERVE = "500";
+const INITIAL_HOLDER_BALANCE = "10000";
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new Error(`Missing ${name} in apps/demo/.env`);
+  if (!value) throw new Error(`Missing ${name} in apps/stablecoin/.env`);
   return value;
 }
 
@@ -35,7 +34,7 @@ function envPrivateKey(name: string): Hex {
 async function loadArtifact(name: string): Promise<{ abi: Abi; bytecode: Hex }> {
   const file = Bun.file(`${ARTIFACTS}/${name}.sol/${name}.json`);
   if (!(await file.exists())) {
-    throw new Error(`Missing ${name} artifact. Run \`bun run build\` in packages/contracts first.`);
+    throw new Error("Missing contract artifact. Run `bun run --filter '@stablecoin-card/contracts' build` from the repo root first.");
   }
   const artifact = (await file.json()) as { abi: Abi; bytecode: { object: Hex } };
   return { abi: artifact.abi, bytecode: artifact.bytecode.object };
@@ -43,8 +42,7 @@ async function loadArtifact(name: string): Promise<{ abi: Abi; bytecode: Hex }> 
 
 async function main(): Promise<void> {
   const rpcUrl = process.env.RPC_URL ?? "http://127.0.0.1:8545";
-  const initialDeposit = parseUnits(INITIAL_DEPOSIT, TOKEN_DECIMALS);
-  const yieldReserve = parseUnits(YIELD_RESERVE, TOKEN_DECIMALS);
+  const initialHolderBalance = parseUnits(INITIAL_HOLDER_BALANCE, TOKEN_DECIMALS);
 
   const deployer = privateKeyToAccount(envPrivateKey("DEMO_DEPLOYER_PRIVATE_KEY"));
   const issuer = privateKeyToAccount(envPrivateKey("DEMO_ISSUER_PRIVATE_KEY"));
@@ -52,10 +50,9 @@ async function main(): Promise<void> {
 
   const publicClient = createPublicClient({ chain: foundry, transport: http(rpcUrl), pollingInterval: 200 });
   const deployerClient = createWalletClient({ account: deployer, chain: foundry, transport: http(rpcUrl) });
-  const holderClient = createWalletClient({ account: holder, chain: foundry, transport: http(rpcUrl) });
 
   const chainId = await publicClient.getChainId();
-  console.log(`Deploying money-market demo contracts to ${rpcUrl} (chain ${chainId})`);
+  console.log(`Deploying stablecoin demo contracts to ${rpcUrl} (chain ${chainId})`);
   console.log(`  deployer: ${deployer.address}`);
   console.log(`  issuer:   ${issuer.address}`);
   console.log(`  holder:   ${holder.address}`);
@@ -71,71 +68,30 @@ async function main(): Promise<void> {
   });
   if (!stablecoin) throw new Error("MockERC20 deployment produced no address");
 
-  const moneyMarketArtifact = await loadArtifact("MockMoneyMarket");
-  const { contractAddress: moneyMarket } = await deployerClient.sendTransactionSync({
-    data: encodeDeployData({
-      abi: moneyMarketArtifact.abi,
-      bytecode: moneyMarketArtifact.bytecode,
-      args: [stablecoin],
-    }),
-    throwOnReceiptRevert: true,
-  });
-  if (!moneyMarket) throw new Error("MockMoneyMarket deployment produced no address");
-
-  const adapterArtifact = await loadArtifact("MoneyMarketAdapter");
+  const adapterArtifact = await loadArtifact("StablecoinAdapter");
   const { contractAddress: adapter } = await deployerClient.sendTransactionSync({
     data: encodeDeployData({
       abi: adapterArtifact.abi,
       bytecode: adapterArtifact.bytecode,
-      args: [issuer.address, moneyMarket],
+      args: [issuer.address, stablecoin],
     }),
     throwOnReceiptRevert: true,
   });
-  if (!adapter) throw new Error("MoneyMarketAdapter deployment produced no address");
+  if (!adapter) throw new Error("StablecoinAdapter deployment produced no address");
 
   await deployerClient.writeContractSync({
     address: stablecoin,
     abi: erc20Abi,
     functionName: "mint",
-    args: [holder.address, initialDeposit],
-    throwOnReceiptRevert: true,
-  });
-  await holderClient.writeContractSync({
-    address: stablecoin,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [moneyMarket, initialDeposit],
-    throwOnReceiptRevert: true,
-  });
-  await holderClient.writeContractSync({
-    address: moneyMarket,
-    abi: moneyMarketArtifact.abi,
-    functionName: "deposit",
-    args: [initialDeposit, holder.address],
-    throwOnReceiptRevert: true,
-  });
-  await deployerClient.writeContractSync({
-    address: stablecoin,
-    abi: erc20Abi,
-    functionName: "mint",
-    args: [moneyMarket, yieldReserve],
+    args: [holder.address, initialHolderBalance],
     throwOnReceiptRevert: true,
   });
 
-  const receiptBalance = await publicClient.readContract({
-    address: moneyMarket,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [holder.address],
-  });
-
-  console.log(`\nDeposited ${formatUnits(initialDeposit, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`);
-  console.log(`Holder receipt balance: ${formatUnits(receiptBalance, TOKEN_DECIMALS)} mUSDC`);
-  console.log(`Prefunded market yield reserve: ${formatUnits(yieldReserve, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`);
-  console.log("\nMoney-market deployment env values:");
-  console.log(`DEMO_MM_STABLECOIN_ADDRESS=${stablecoin}`);
-  console.log(`DEMO_MM_MONEY_MARKET_ADDRESS=${moneyMarket}`);
-  console.log(`DEMO_MM_ADAPTER_ADDRESS=${adapter}`);
+  console.log(`\nFunded holder with ${formatUnits(initialHolderBalance, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`);
+  console.log("\nAdd these values to apps/stablecoin/.env:");
+  console.log(`DEMO_STABLECOIN_ADDRESS=${stablecoin}`);
+  console.log(`DEMO_ASSET_ADDRESS=${stablecoin}`);
+  console.log(`DEMO_ADAPTER_ADDRESS=${adapter}`);
 }
 
 main().catch((err) => {

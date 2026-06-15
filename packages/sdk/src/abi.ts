@@ -39,6 +39,23 @@ export const settlementAdapterAbi = [
     outputs: [],
   },
   {
+    type: "function",
+    name: "settleBatch",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "settlements",
+        type: "tuple[]",
+        components: [
+          { name: "holder", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "recipient", type: "address" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
     type: "event",
     name: "Settled",
     inputs: [

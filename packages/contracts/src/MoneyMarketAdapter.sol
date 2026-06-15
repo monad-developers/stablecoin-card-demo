@@ -59,4 +59,27 @@ contract MoneyMarketAdapter is ISettlementAdapter {
 
         emit Settled(holder, recipient, amount);
     }
+
+    /// @inheritdoc ISettlementAdapter
+    function settleBatch(Settlement[] calldata settlements) external override {
+        if (msg.sender != issuer) revert NotIssuer();
+
+        for (uint256 i = 0; i < settlements.length; i++) {
+            Settlement calldata settlement = settlements[i];
+            uint256 available = spendable(settlement.holder);
+            if (settlement.amount > available) {
+                revert InsufficientSpendable(settlement.amount, available);
+            }
+
+            uint256 shares = IMoneyMarket(moneyMarket).previewWithdraw(settlement.amount);
+            ERC20(moneyMarket).safeTransferFrom(settlement.holder, address(this), shares);
+            uint256 assets = IMoneyMarket(moneyMarket).redeem(shares, address(this));
+            ERC20(stablecoin).safeTransfer(settlement.recipient, settlement.amount);
+            if (assets > settlement.amount) {
+                ERC20(stablecoin).safeTransfer(settlement.holder, assets - settlement.amount);
+            }
+
+            emit Settled(settlement.holder, settlement.recipient, settlement.amount);
+        }
+    }
 }

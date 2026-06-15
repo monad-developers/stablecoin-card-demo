@@ -34,10 +34,7 @@ contract StablecoinAdapter is ISettlementAdapter {
     }
 
     /// @inheritdoc ISettlementAdapter
-    function settle(address holder, uint256 amount, address recipient)
-        external
-        override
-    {
+    function settle(address holder, uint256 amount, address recipient) external override {
         if (msg.sender != issuer) revert NotIssuer();
 
         uint256 available = spendable(holder);
@@ -46,5 +43,23 @@ contract StablecoinAdapter is ISettlementAdapter {
         ERC20(stablecoin).safeTransferFrom(holder, recipient, amount);
 
         emit Settled(holder, recipient, amount);
+    }
+
+    /// @inheritdoc ISettlementAdapter
+    function settleBatch(Settlement[] calldata settlements) external override {
+        if (msg.sender != issuer) revert NotIssuer();
+
+        for (uint256 i = 0; i < settlements.length; i++) {
+            Settlement calldata settlement = settlements[i];
+            uint256 available = spendable(settlement.holder);
+            if (settlement.amount > available) {
+                revert InsufficientSpendable(settlement.amount, available);
+            }
+
+            ERC20(stablecoin)
+                .safeTransferFrom(settlement.holder, settlement.recipient, settlement.amount);
+
+            emit Settled(settlement.holder, settlement.recipient, settlement.amount);
+        }
     }
 }
