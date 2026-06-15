@@ -74,6 +74,7 @@ This is a [Bun](https://bun.com) workspace monorepo.
 | `packages/sdk` | `@stablecoin-card/sdk` | **Integration layer.** Typesafe [viem](https://viem.sh) actions for approving an allowance, reading spendable balance, settling, and tracking a settlement to finality — for any TS consumer. |
 | `apps/stablecoin` | `@stablecoin-card/stablecoin` | **Stablecoin flow.** Setup and notebook scripts for direct ERC-20 settlement through `StablecoinAdapter`. |
 | `apps/money-market` | `@stablecoin-card/money-market` | **Money-market flow.** Setup and notebook scripts for yield-bearing receipt-token settlement through `MoneyMarketAdapter`. |
+| `apps/frontend` | `@stablecoin-card/frontend` | **Frontend app.** Bun + React + Tailwind workspace for building the demo UI. |
 
 ## Prerequisites
 
@@ -173,6 +174,29 @@ Add those printed addresses to `apps/money-market/.env`, then run the notebook f
 ```bash
 bun notebook.ts
 ```
+
+### Frontend
+
+Prepare the frontend env file:
+
+```bash
+cd apps/frontend
+cp .env.example .env
+```
+
+With Anvil running, deploy both frontend demo strategies:
+
+```bash
+bun run setup
+```
+
+Add the printed `BUN_PUBLIC_*` addresses to `apps/frontend/.env`, then run the Bun React dev server:
+
+```bash
+bun run dev
+```
+
+The server prints the local URL, usually `http://localhost:3000`.
 
 ## License
 

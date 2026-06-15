@@ -7,6 +7,7 @@
   "references": [
     { "path": "./packages/sdk" },
     { "path": "./apps/stablecoin" },
-    { "path": "./apps/money-market" }
+    { "path": "./apps/money-market" },
+    { "path": "./apps/frontend" }
   ]
 }
