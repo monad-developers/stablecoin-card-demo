@@ -1,0 +1,13 @@
+.git
+.env
+.env.*
+node_modules
+**/node_modules
+dist
+out
+coverage
+*.log
+*.tsbuildinfo
+packages/contracts/cache
+packages/contracts/broadcast
+packages/contracts/lib

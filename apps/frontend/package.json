@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --hot src/index.ts",
+    "start": "bun src/index.ts",
     "setup": "bun setup.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "build": "bun run typecheck"

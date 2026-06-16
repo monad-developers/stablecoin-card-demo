@@ -95,7 +95,7 @@ const server = Bun.serve({
 
         await deployerClient.sendTransactionSync({
           to: holder.address,
-          value: parseEther("1"),
+          value: parseEther("0.1"),
           throwOnReceiptRevert: true,
         });
 
@@ -146,7 +146,7 @@ const server = Bun.serve({
       }),
     },
   },
-  development: {
+  development: process.env.NODE_ENV === "production" ? false : {
     hmr: true,
     console: true,
   },
