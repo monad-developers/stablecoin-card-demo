@@ -9,9 +9,9 @@ import {
   parseUnits,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
 
 import { erc20Abi } from "@stablecoin-card/sdk";
+import { demoChain, rpcUrl } from "./src/chain";
 
 const ARTIFACTS = `${import.meta.dir}/../../packages/contracts/out`;
 const TOKEN_DECIMALS = 18;
@@ -41,12 +41,11 @@ async function loadArtifact(name: string): Promise<{ abi: Abi; bytecode: Hex }> 
 }
 
 async function main(): Promise<void> {
-  const rpcUrl = process.env.BUN_PUBLIC_RPC_URL ?? "http://127.0.0.1:8545";
   const deployer = privateKeyToAccount(envPrivateKey("DEMO_DEPLOYER_PRIVATE_KEY"));
   const issuer = privateKeyToAccount(envPrivateKey("DEMO_ISSUER_PRIVATE_KEY"));
 
-  const publicClient = createPublicClient({ chain: foundry, transport: http(rpcUrl), pollingInterval: 200 });
-  const deployerClient = createWalletClient({ account: deployer, chain: foundry, transport: http(rpcUrl) });
+  const publicClient = createPublicClient({ chain: demoChain, transport: http(rpcUrl), pollingInterval: 200 });
+  const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: http(rpcUrl) });
 
   const chainId = await publicClient.getChainId();
   console.log(`Deploying frontend demo contracts to ${rpcUrl} (chain ${chainId})`);

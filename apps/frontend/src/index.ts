@@ -8,7 +8,6 @@ import {
   parseUnits,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { foundry } from "viem/chains";
 import { approveSpender, erc20Abi, settle } from "@stablecoin-card/sdk";
 
 import {
@@ -19,6 +18,7 @@ import {
   isStrategyId,
 } from "./demo";
 import { acquirer, rpcUrl, strategies } from "./config";
+import { demoChain } from "./chain";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -73,8 +73,8 @@ async function handleError(fn: () => Promise<Response>): Promise<Response> {
 
 const deployer = privateKeyToAccount(envPrivateKey("DEMO_DEPLOYER_PRIVATE_KEY"));
 const issuer = privateKeyToAccount(envPrivateKey("DEMO_ISSUER_PRIVATE_KEY"));
-const deployerClient = createWalletClient({ account: deployer, chain: foundry, transport: http(rpcUrl) });
-const issuerClient = createWalletClient({ account: issuer, chain: foundry, transport: http(rpcUrl) });
+const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: http(rpcUrl) });
+const issuerClient = createWalletClient({ account: issuer, chain: demoChain, transport: http(rpcUrl) });
 
 const server = Bun.serve({
   port,
@@ -89,13 +89,13 @@ const server = Bun.serve({
 
         const privateKey = generatePrivateKey();
         const holder = privateKeyToAccount(privateKey);
-        const holderClient = createWalletClient({ account: holder, chain: foundry, transport: http(rpcUrl) });
+        const holderClient = createWalletClient({ account: holder, chain: demoChain, transport: http(rpcUrl) });
         const strategy = strategies[strategyId];
         const balance = parseUnits(DEFAULT_HOLDER_BALANCE, TOKEN_DECIMALS);
 
         await deployerClient.sendTransactionSync({
           to: holder.address,
-          value: parseEther("0.1"),
+          value: parseEther("0.25"),
           throwOnReceiptRevert: true,
         });
 

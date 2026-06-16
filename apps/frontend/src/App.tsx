@@ -7,7 +7,6 @@ import {
   formatUnits,
   http,
 } from "viem";
-import { foundry } from "viem/chains";
 import { readSpendable, waitForFinality } from "@stablecoin-card/sdk";
 
 import {
@@ -20,6 +19,7 @@ import {
   strategyIds,
 } from "./demo";
 import { acquirer, rpcUrl, strategies } from "./config";
+import { demoChain } from "./chain";
 
 type FlowStatus = "idle" | "running" | "complete";
 
@@ -30,7 +30,7 @@ type FlowStep = {
 };
 
 const publicClient = createPublicClient({
-  chain: foundry,
+  chain: demoChain,
   transport: http(rpcUrl),
   pollingInterval: 200,
 });

@@ -1,6 +1,7 @@
 import type { Address } from "viem";
 
 import type { DemoStrategy, StrategyId } from "./demo";
+export { rpcUrl } from "./chain";
 
 function requiredValue(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing ${name} in apps/frontend/.env`);
@@ -13,7 +14,6 @@ function envAddress(name: string, value: string | undefined): Address {
   return resolved as Address;
 }
 
-export const rpcUrl = requiredValue("BUN_PUBLIC_RPC_URL", process.env.BUN_PUBLIC_RPC_URL);
 export const acquirer = envAddress(
   "BUN_PUBLIC_ACQUIRER_ADDRESS",
   process.env.BUN_PUBLIC_ACQUIRER_ADDRESS,
