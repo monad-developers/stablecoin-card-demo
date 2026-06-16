@@ -1,8 +1,5 @@
 import { defineChain } from "viem";
 
-const publicChainId = typeof process === "undefined" ? undefined : process.env.BUN_PUBLIC_CHAIN_ID;
-const publicRpcUrl = typeof process === "undefined" ? undefined : process.env.BUN_PUBLIC_RPC_URL;
-
 function requiredValue(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing ${name} in apps/frontend/.env`);
   return value;
@@ -21,8 +18,8 @@ function defaultChainName(chainId: number): string {
   return `Chain ${chainId}`;
 }
 
-export const chainId = requiredNumber("BUN_PUBLIC_CHAIN_ID", publicChainId);
-export const rpcUrl = requiredValue("BUN_PUBLIC_RPC_URL", publicRpcUrl);
+export const chainId = requiredNumber("BUN_PUBLIC_CHAIN_ID", process.env.BUN_PUBLIC_CHAIN_ID);
+export const rpcUrl = requiredValue("BUN_PUBLIC_RPC_URL", process.env.BUN_PUBLIC_RPC_URL);
 export const chainName = defaultChainName(chainId);
 
 export const demoChain = defineChain({
