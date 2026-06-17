@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  type Block,
   type Address,
   type TransactionReceipt,
   createPublicClient,
@@ -36,9 +37,11 @@ const publicClient = createPublicClient({
 });
 
 const initialFlowSteps: FlowStep[] = [
-  { label: "Call settle on adapter", status: "pending" },
+  { label: "settle() transaction", status: "pending" },
   { label: "Wait for transaction finality", status: "pending" },
 ];
+
+const monadScanBaseUrl = "https://testnet.monadscan.com";
 
 function getStrategyFromPath(): StrategyId {
   return window.location.pathname === "/money-market" ? "money-market" : "stablecoin";
@@ -51,6 +54,14 @@ function deserializeReceipt(receipt: SerializedReceipt): TransactionReceipt {
     transactionHash: receipt.transactionHash,
     status: receipt.status,
   } as TransactionReceipt;
+}
+
+function explorerTxUrl(hash: string): string {
+  return `${monadScanBaseUrl}/tx/${hash}`;
+}
+
+function explorerBlockUrl(blockNumber: bigint): string {
+  return `${monadScanBaseUrl}/block/${blockNumber}`;
 }
 
 async function postJson<T>(url: string, body?: unknown): Promise<T> {
@@ -110,7 +121,8 @@ export function App() {
     queryKey: ["spendable", activeStrategyId, holder],
     enabled: holder !== undefined,
     queryFn: () => readSpendable(publicClient, { strategy, holder: holder! }),
-    staleTime: 5_000,
+    refetchInterval: 500,
+    staleTime: 500,
   });
 
   useEffect(() => {
@@ -218,7 +230,7 @@ function CardholderPanel({
   spendable: bigint | undefined;
   spendableStatus: "pending" | "error" | "success";
 }) {
-  const balance = spendable === undefined ? "-" : `${formatUnits(spendable, TOKEN_DECIMALS)} USDC`;
+  const balance = spendable === undefined ? "-" : `${Number(formatUnits(spendable, TOKEN_DECIMALS)).toFixed(2)} USDC`;
   const balanceText = spendable !== undefined
     ? balance
     : isRefreshing
@@ -275,6 +287,8 @@ function TransactionPanel({
 }) {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [flowStatus, setFlowStatus] = useState<FlowStatus>("idle");
+  const [settleReceipt, setSettleReceipt] = useState<SerializedReceipt | null>(null);
+  const [confirmingBlocks, setConfirmingBlocks] = useState<Block[]>([]);
   const [steps, setSteps] = useState<FlowStep[]>(initialFlowSteps);
   const settlementAmount = BigInt(10) ** BigInt(TOKEN_DECIMALS);
   const canSettle = holder !== undefined && spendable !== undefined && spendable >= settlementAmount;
@@ -286,6 +300,8 @@ function TransactionPanel({
   useEffect(() => {
     setFlowError(null);
     setFlowStatus("idle");
+    setSettleReceipt(null);
+    setConfirmingBlocks([]);
     setSteps(initialFlowSteps);
   }, [holder, strategyId]);
 
@@ -294,8 +310,10 @@ function TransactionPanel({
 
     setFlowError(null);
     setFlowStatus("running");
+    setSettleReceipt(null);
+    setConfirmingBlocks([]);
     setSteps([
-      { label: "Call settle on adapter", status: "running" },
+      { label: "settle() transaction", status: "running" },
       { label: "Wait for transaction finality", status: "pending" },
     ]);
 
@@ -303,18 +321,20 @@ function TransactionPanel({
       const settleStartedAt = performance.now();
       const { receipt } = await settleMutation.mutateAsync();
       const settleDuration = performance.now() - settleStartedAt;
+      setSettleReceipt(receipt);
 
       setSteps([
-        { label: "Call settle on adapter", status: "complete", durationMs: settleDuration },
+        { label: "settle() transaction", status: "complete", durationMs: settleDuration },
         { label: "Wait for transaction finality", status: "running" },
       ]);
 
       const finalityStartedAt = performance.now();
-      await waitForFinality(publicClient, deserializeReceipt(receipt));
+      const finalizedBlocks = await waitForFinality(publicClient, deserializeReceipt(receipt));
       const finalityDuration = performance.now() - finalityStartedAt;
+      setConfirmingBlocks(finalizedBlocks);
 
       setSteps([
-        { label: "Call settle on adapter", status: "complete", durationMs: settleDuration },
+        { label: "settle() transaction", status: "complete", durationMs: settleDuration },
         { label: "Wait for transaction finality", status: "complete", durationMs: finalityDuration },
       ]);
       setFlowStatus("complete");
@@ -351,7 +371,7 @@ function TransactionPanel({
             <span className="text-stone-500">Requested</span>
             <span className="font-medium">{Number(SETTLEMENT_AMOUNT).toFixed(2)} USDC</span>
           </div>
-          <div className="flex items-center justify-between gap-4 border-b border-stone-100 pb-4">
+          <div className="flex items-center justify-between gap-4">
             <span className="text-stone-500">Acquirer</span>
             <span className="break-all text-right font-mono text-xs">{acquirer}</span>
           </div>
@@ -380,7 +400,13 @@ function TransactionPanel({
                     step.status === "complete" ? "text-emerald-950" : "text-stone-800"
                   }`}
                 >
-                  {step.label}
+                  {step.label === "settle() transaction" ? (
+                    <>
+                      <code className="font-mono text-xs">settle()</code> transaction
+                    </>
+                  ) : (
+                    step.label
+                  )}
                 </span>
               </div>
               <span className={step.status === "complete" ? "text-emerald-700" : "text-stone-500"}>
@@ -395,6 +421,43 @@ function TransactionPanel({
             </li>
           ))}
         </ol>
+
+        {settleReceipt ? (
+          <div className="mt-4 space-y-4 text-sm">
+            <div className="flex items-center justify-between gap-4 border-b border-stone-100 pb-4">
+              <span className="text-stone-500">Transaction hash</span>
+              <a
+                className="break-all text-right font-mono text-xs text-stone-800 underline underline-offset-4 hover:text-stone-950"
+                href={explorerTxUrl(settleReceipt.transactionHash)}
+                rel="noreferrer"
+                target="_blank"
+                title={settleReceipt.transactionHash}
+              >
+                {settleReceipt.transactionHash}
+              </a>
+            </div>
+            {confirmingBlocks.length > 0 ? (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-stone-500">Confirming blocks</span>
+                <span className="flex flex-wrap justify-end gap-2 text-right font-mono text-xs">
+                  {confirmingBlocks.map((block) => (
+                    block.number === null ? null : (
+                      <a
+                        className="text-stone-800 underline underline-offset-4 hover:text-stone-950"
+                        href={explorerBlockUrl(block.number)}
+                        key={block.number.toString()}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        {block.number.toString()}
+                      </a>
+                    )
+                  ))}
+                </span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {holder && spendable !== undefined && !canSettle ? (
           <p className="mt-4 text-sm text-red-700">Not enough spendable balance to settle $1.</p>

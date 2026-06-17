@@ -56,13 +56,13 @@ contract MoneyMarketAdapterTest is Test {
 
     function test_MoneyMarketRedeemsAtBetterRate() public {
         vm.roll(block.number + 10);
-        usdc.mint(address(moneyMarket), 100 * UNIT);
+        usdc.mint(address(moneyMarket), 500 * UNIT);
 
         vm.prank(holder);
         moneyMarket.redeem(10_000 * UNIT, holder);
 
         assertEq(moneyMarket.balanceOf(holder), 0);
-        assertEq(usdc.balanceOf(holder), 10_100 * UNIT);
+        assertEq(usdc.balanceOf(holder), 10_500 * UNIT);
     }
 
     /*//////////////////// SPENDABLE (BALANCE RECOGNITION) ////////////////////*/
@@ -70,7 +70,7 @@ contract MoneyMarketAdapterTest is Test {
     function test_SpendableIncludesAccruedYield() public {
         vm.roll(block.number + 10);
 
-        assertEq(adapter.spendable(holder), 10_100 * UNIT);
+        assertEq(adapter.spendable(holder), 10_500 * UNIT);
     }
 
     function test_SpendableBoundedByReceiptAllowance() public {
@@ -79,7 +79,7 @@ contract MoneyMarketAdapterTest is Test {
 
         vm.roll(block.number + 10);
 
-        assertEq(adapter.spendable(holder), 252 * UNIT + UNIT / 2);
+        assertEq(adapter.spendable(holder), 262 * UNIT + UNIT / 2);
     }
 
     function test_SpendableZeroWithoutApproval() public {
@@ -98,10 +98,10 @@ contract MoneyMarketAdapterTest is Test {
 
     function test_FullCardFlow_DepositEarnAndSettle() public {
         vm.roll(block.number + 10);
-        usdc.mint(address(moneyMarket), 100 * UNIT);
+        usdc.mint(address(moneyMarket), 500 * UNIT);
 
         assertEq(moneyMarket.balanceOf(holder), 10_000 * UNIT);
-        assertEq(adapter.spendable(holder), 10_100 * UNIT);
+        assertEq(adapter.spendable(holder), 10_500 * UNIT);
 
         vm.expectEmit(true, false, false, true);
         emit Settled(holder, acquirer, 101 * UNIT);
@@ -110,13 +110,13 @@ contract MoneyMarketAdapterTest is Test {
         adapter.settle(holder, 101 * UNIT, acquirer);
 
         assertEq(usdc.balanceOf(acquirer), 101 * UNIT);
-        assertEq(moneyMarket.balanceOf(holder), 9_900 * UNIT);
-        assertEq(adapter.spendable(holder), 9_999 * UNIT);
+        assertEq(moneyMarket.balanceOf(holder), 9_903 * UNIT + 809_523);
+        assertEq(adapter.spendable(holder), 10_398 * UNIT + 999_999);
     }
 
     function test_FullCardFlow_SettleBatch() public {
         vm.roll(block.number + 10);
-        usdc.mint(address(moneyMarket), 100 * UNIT);
+        usdc.mint(address(moneyMarket), 750 * UNIT);
 
         ISettlementAdapter.Settlement[] memory settlements = new ISettlementAdapter.Settlement[](2);
         settlements[0] = ISettlementAdapter.Settlement(holder, 101 * UNIT, acquirer);
@@ -132,8 +132,8 @@ contract MoneyMarketAdapterTest is Test {
 
         assertEq(usdc.balanceOf(acquirer), 101 * UNIT);
         assertEq(usdc.balanceOf(acquirer2), 202 * UNIT);
-        assertEq(moneyMarket.balanceOf(holder), 9_900 * UNIT);
-        assertEq(moneyMarket.balanceOf(holder2), 4_800 * UNIT);
+        assertEq(moneyMarket.balanceOf(holder), 9_903 * UNIT + 809_523);
+        assertEq(moneyMarket.balanceOf(holder2), 4_807 * UNIT + 619_047);
     }
 
     function test_RevertWhen_CallerNotIssuer() public {
@@ -156,12 +156,12 @@ contract MoneyMarketAdapterTest is Test {
 
         ISettlementAdapter.Settlement[] memory settlements = new ISettlementAdapter.Settlement[](2);
         settlements[0] = ISettlementAdapter.Settlement(holder, 101 * UNIT, acquirer);
-        settlements[1] = ISettlementAdapter.Settlement(holder2, 5_051 * UNIT, acquirer2);
+        settlements[1] = ISettlementAdapter.Settlement(holder2, 5_251 * UNIT, acquirer2);
 
         vm.prank(issuer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MoneyMarketAdapter.InsufficientSpendable.selector, 5_051 * UNIT, 5_050 * UNIT
+                MoneyMarketAdapter.InsufficientSpendable.selector, 5_251 * UNIT, 5_250 * UNIT
             )
         );
         adapter.settleBatch(settlements);
@@ -181,7 +181,7 @@ contract MoneyMarketAdapterTest is Test {
         vm.prank(issuer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MoneyMarketAdapter.InsufficientSpendable.selector, 60 * UNIT, 50 * UNIT + UNIT / 2
+                MoneyMarketAdapter.InsufficientSpendable.selector, 60 * UNIT, 52 * UNIT + UNIT / 2
             )
         );
         adapter.settle(holder, 60 * UNIT, acquirer);
@@ -193,9 +193,9 @@ contract MoneyMarketAdapterTest is Test {
         vm.prank(issuer);
         vm.expectRevert(
             abi.encodeWithSelector(
-                MoneyMarketAdapter.InsufficientSpendable.selector, 10_101 * UNIT, 10_100 * UNIT
+                MoneyMarketAdapter.InsufficientSpendable.selector, 10_501 * UNIT, 10_500 * UNIT
             )
         );
-        adapter.settle(holder, 10_101 * UNIT, acquirer);
+        adapter.settle(holder, 10_501 * UNIT, acquirer);
     }
 }

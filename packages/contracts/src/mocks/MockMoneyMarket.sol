@@ -10,8 +10,8 @@ contract MockMoneyMarket is ERC20 {
 
     uint256 internal constant SCALE = 1e18;
 
-    /// @notice Hardcoded linear interest: 0.1% added to the conversion rate per block.
-    uint256 internal constant INTEREST_PER_BLOCK = 1e15;
+    /// @notice Hardcoded linear interest: 0.5% added to the conversion rate per block.
+    uint256 internal constant INTEREST_PER_BLOCK = 5e15;
 
     ERC20 public immutable stablecoin;
     uint256 internal storedConversionRate = SCALE;

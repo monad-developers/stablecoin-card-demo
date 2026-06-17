@@ -51,6 +51,18 @@ function json(data: unknown, status = 200): Response {
   return Response.json(data, { status });
 }
 
+let writerLock = Promise.resolve();
+
+async function acquireWriterLock(): Promise<() => void> {
+  let release!: () => void;
+  const previousWriter = writerLock;
+  writerLock = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await previousWriter;
+  return release;
+}
+
 function serializeReceipt(receipt: Awaited<ReturnType<typeof settle>>): SerializedReceipt {
   if (!receipt.blockHash) throw new Error("Settlement receipt has no block hash");
 
@@ -87,46 +99,53 @@ const server = Bun.serve({
         const { strategyId } = req.params;
         if (!isStrategyId(strategyId)) return json({ error: "Unknown strategy" }, 404);
 
-        const privateKey = generatePrivateKey();
-        const holder = privateKeyToAccount(privateKey);
-        const holderClient = createWalletClient({ account: holder, chain: demoChain, transport: http(rpcUrl) });
-        const strategy = strategies[strategyId];
-        const balance = parseUnits(DEFAULT_HOLDER_BALANCE, TOKEN_DECIMALS);
+        const releaseWriter = await acquireWriterLock();
+        try {
+          const privateKey = generatePrivateKey();
+          const holder = privateKeyToAccount(privateKey);
+          const holderClient = createWalletClient({ account: holder, chain: demoChain, transport: http(rpcUrl) });
+          const strategy = strategies[strategyId];
+          const balance = parseUnits(DEFAULT_HOLDER_BALANCE, TOKEN_DECIMALS);
 
-        await deployerClient.sendTransactionSync({
-          to: holder.address,
-          value: parseEther("0.25"),
-          throwOnReceiptRevert: true,
-        });
+          await deployerClient.sendTransactionSync({
+            to: holder.address,
+            value: parseEther("0.05"),
+            throwOnReceiptRevert: true,
+          });
+          await Bun.sleep(2_000);
 
-        await deployerClient.writeContractSync({
-          address: strategy.stablecoin,
-          abi: erc20Abi,
-          functionName: "mint",
-          args: [holder.address, balance],
-          throwOnReceiptRevert: true,
-        });
-
-        if (strategyId === "money-market") {
-          await holderClient.writeContractSync({
+          await deployerClient.writeContractSync({
             address: strategy.stablecoin,
             abi: erc20Abi,
-            functionName: "approve",
-            args: [strategy.asset, balance],
+            functionName: "mint",
+            args: [holder.address, balance],
             throwOnReceiptRevert: true,
           });
-          await holderClient.writeContractSync({
-            address: strategy.asset,
-            abi: moneyMarketAbi,
-            functionName: "deposit",
-            args: [balance, holder.address],
-            throwOnReceiptRevert: true,
-          });
+
+          if (strategyId === "money-market") {
+            await Bun.sleep(2_000);
+            await holderClient.writeContractSync({
+              address: strategy.stablecoin,
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [strategy.asset, balance],
+              throwOnReceiptRevert: true,
+            });
+            await holderClient.writeContractSync({
+              address: strategy.asset,
+              abi: moneyMarketAbi,
+              functionName: "deposit",
+              args: [balance, holder.address],
+              throwOnReceiptRevert: true,
+            });
+          }
+
+          await approveSpender(holderClient, { strategy });
+
+          return json({ holder: holder.address });
+        } finally {
+          releaseWriter();
         }
-
-        await approveSpender(holderClient, { strategy });
-
-        return json({ holder: holder.address });
       }),
     },
     "/api/settle": {
@@ -134,15 +153,22 @@ const server = Bun.serve({
         const body = (await req.json()) as { strategyId?: string; holder?: string };
         if (!body.strategyId || !isStrategyId(body.strategyId)) return json({ error: "Unknown strategy" }, 400);
         if (!body.holder || !/^0x[0-9a-fA-F]{40}$/.test(body.holder)) return json({ error: "Invalid holder" }, 400);
+        const strategyId = body.strategyId;
+        const holder = body.holder as Address;
 
-        const receipt = await settle(issuerClient, {
-          strategy: strategies[body.strategyId],
-          holder: body.holder as Address,
-          amount: parseUnits(SETTLEMENT_AMOUNT, TOKEN_DECIMALS),
-          recipient: acquirer,
-        });
+        const releaseWriter = await acquireWriterLock();
+        try {
+          const receipt = await settle(issuerClient, {
+            strategy: strategies[strategyId],
+            holder,
+            amount: parseUnits(SETTLEMENT_AMOUNT, TOKEN_DECIMALS),
+            recipient: acquirer,
+          });
 
-        return json({ receipt: serializeReceipt(receipt) });
+          return json({ receipt: serializeReceipt(receipt) });
+        } finally {
+          releaseWriter();
+        }
       }),
     },
   },
