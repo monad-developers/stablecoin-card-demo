@@ -64,6 +64,17 @@ stablecoin* — all behind the same `spendable` + `settle` surface.
 | **Money market** | yield-bearing shares (ERC-4626 / aToken) | pull shares, redeem to the underlying stablecoin, deliver it — funds earn yield until the instant of settlement. | ✅ |
 | **Swap** | a different asset | pull the asset, swap it to the stablecoin at settlement time, deliver it. | 🚧 Planned |
 
+## Gas usage
+
+Measured with `packages/sdk/script/costs.ts` against the stablecoin adapter. Dollar costs use a
+100 gwei gas price and `$0.023` per MON.
+
+| Operation | Payments | Gas used | Per-payment USD |
+| --- | ---: | ---: | ---: |
+| ERC-20 `transfer` | 1 | 63,219 | $0.000145 |
+| `settle()` | 1 | 69,706 | $0.000160 |
+| `settleBatch()` | 10 | 156,489 | $0.00003599 |
+
 ## Repository layout
 
 This is a [Bun](https://bun.com) workspace monorepo.
