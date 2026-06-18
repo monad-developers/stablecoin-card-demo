@@ -4,7 +4,7 @@ export const TOKEN_DECIMALS = 18;
 export const DEFAULT_HOLDER_BALANCE = "5";
 export const SETTLEMENT_AMOUNT = "1";
 
-export type StrategyId = "stablecoin" | "money-market";
+export type StrategyId = "stablecoin" | "money-market" | "aave-borrow";
 
 export type DemoStrategy = {
   adapter: Address;
@@ -27,8 +27,8 @@ export type SettleResponse = {
   receipt: SerializedReceipt;
 };
 
-export const strategyIds: StrategyId[] = ["stablecoin", "money-market"];
+export const strategyIds: StrategyId[] = ["stablecoin", "money-market", "aave-borrow"];
 
 export function isStrategyId(value: string): value is StrategyId {
-  return value === "stablecoin" || value === "money-market";
+  return value === "stablecoin" || value === "money-market" || value === "aave-borrow";
 }

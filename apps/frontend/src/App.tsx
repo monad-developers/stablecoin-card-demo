@@ -44,7 +44,10 @@ const initialFlowSteps: FlowStep[] = [
 const monadScanBaseUrl = "https://testnet.monadscan.com";
 
 function getStrategyFromPath(): StrategyId {
-  return window.location.pathname === "/money-market" ? "money-market" : "stablecoin";
+  const path = window.location.pathname;
+  if (path === "/money-market") return "money-market";
+  if (path === "/aave-borrow") return "aave-borrow";
+  return "stablecoin";
 }
 
 function getIsAboutFromPath(): boolean {
@@ -152,7 +155,7 @@ export function App() {
   }, [activeStrategyId, holder, isAbout]);
 
   function navigate(strategyId: StrategyId) {
-    const path = strategyId === "stablecoin" ? "/stablecoin" : "/money-market";
+    const path = `/${strategyId}`;
     window.history.pushState({}, "", path);
     setActiveStrategyId(strategyId);
     setIsAbout(false);
@@ -269,6 +272,7 @@ function AboutPage() {
   const strategies = [
     { name: "Stablecoin", holds: "the stablecoin itself", status: "Live" },
     { name: "Money market", holds: "yield-bearing shares (ERC-4626 / aToken)", status: "Live" },
+    { name: "Aave borrow", holds: "collateral in Aave, borrowing USDC at settlement", status: "Live" },
     { name: "Swap", holds: "a different asset", status: "Planned" },
   ];
 

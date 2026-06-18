@@ -30,4 +30,21 @@ export const strategies: Record<StrategyId, DemoStrategy> = {
     asset: envAddress("BUN_PUBLIC_MM_MONEY_MARKET_ADDRESS", process.env.BUN_PUBLIC_MM_MONEY_MARKET_ADDRESS),
     adapter: envAddress("BUN_PUBLIC_MM_ADAPTER_ADDRESS", process.env.BUN_PUBLIC_MM_ADAPTER_ADDRESS),
   },
+  "aave-borrow": {
+    stablecoin: envAddress("BUN_PUBLIC_AAVE_STABLECOIN_ADDRESS", process.env.BUN_PUBLIC_AAVE_STABLECOIN_ADDRESS),
+    asset: envAddress(
+      "BUN_PUBLIC_AAVE_TAKER_POSITION_MANAGER_ADDRESS",
+      process.env.BUN_PUBLIC_AAVE_TAKER_POSITION_MANAGER_ADDRESS,
+    ),
+    adapter: envAddress("BUN_PUBLIC_AAVE_ADAPTER_ADDRESS", process.env.BUN_PUBLIC_AAVE_ADAPTER_ADDRESS),
+  },
+};
+
+export const aaveBorrowConfig = {
+  spoke: envAddress("BUN_PUBLIC_AAVE_SPOKE_ADDRESS", process.env.BUN_PUBLIC_AAVE_SPOKE_ADDRESS),
+  takerPositionManager: envAddress(
+    "BUN_PUBLIC_AAVE_TAKER_POSITION_MANAGER_ADDRESS",
+    process.env.BUN_PUBLIC_AAVE_TAKER_POSITION_MANAGER_ADDRESS,
+  ),
+  debtReserveId: BigInt(requiredValue("BUN_PUBLIC_AAVE_DEBT_RESERVE_ID", process.env.BUN_PUBLIC_AAVE_DEBT_RESERVE_ID)),
 };

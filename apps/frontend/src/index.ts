@@ -17,7 +17,7 @@ import {
   type SerializedReceipt,
   isStrategyId,
 } from "./demo";
-import { acquirer, rpcUrl, strategies } from "./config";
+import { acquirer, aaveBorrowConfig, rpcUrl, strategies } from "./config";
 import { demoChain } from "./chain";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -34,6 +34,41 @@ const moneyMarketAbi = [
     outputs: [{ name: "shares", type: "uint256" }],
   },
 ] as const;
+
+const mockAaveV4SpokeAbi = [
+  {
+    type: "function",
+    name: "setUserAccountData",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "user", type: "address" },
+      { name: "totalCollateralValue", type: "uint256" },
+      { name: "totalDebtValue", type: "uint256" },
+      { name: "avgCollateralFactor", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const mockAaveV4TakerPositionManagerAbi = [
+  {
+    type: "function",
+    name: "approveBorrow",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spoke", type: "address" },
+      { name: "reserveId", type: "uint256" },
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+const AAVE_ORACLE_DECIMALS = 8n;
+const AAVE_HOLDER_COLLATERAL_VALUE = 20_000n * 10n ** AAVE_ORACLE_DECIMALS;
+const AAVE_HOLDER_DEBT_VALUE = 0n;
+const AAVE_HOLDER_AVG_COLLATERAL_FACTOR = 750_000_000_000_000_000n;
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
@@ -94,6 +129,7 @@ const server = Bun.serve({
     "/": index,
     "/stablecoin": index,
     "/money-market": index,
+    "/aave-borrow": index,
     "/about": index,
     "/api/holders/:strategyId": {
       POST: (req) => handleError(async () => {
@@ -115,13 +151,15 @@ const server = Bun.serve({
           });
           await Bun.sleep(2_000);
 
-          await deployerClient.writeContractSync({
-            address: strategy.stablecoin,
-            abi: erc20Abi,
-            functionName: "mint",
-            args: [holder.address, balance],
-            throwOnReceiptRevert: true,
-          });
+          if (strategyId !== "aave-borrow") {
+            await deployerClient.writeContractSync({
+              address: strategy.stablecoin,
+              abi: erc20Abi,
+              functionName: "mint",
+              args: [holder.address, balance],
+              throwOnReceiptRevert: true,
+            });
+          }
 
           if (strategyId === "money-market") {
             await Bun.sleep(2_000);
@@ -139,9 +177,30 @@ const server = Bun.serve({
               args: [balance, holder.address],
               throwOnReceiptRevert: true,
             });
+            await approveSpender(holderClient, { strategy });
+          } else if (strategyId === "aave-borrow") {
+            await deployerClient.writeContractSync({
+              address: aaveBorrowConfig.spoke,
+              abi: mockAaveV4SpokeAbi,
+              functionName: "setUserAccountData",
+              args: [
+                holder.address,
+                AAVE_HOLDER_COLLATERAL_VALUE,
+                AAVE_HOLDER_DEBT_VALUE,
+                AAVE_HOLDER_AVG_COLLATERAL_FACTOR,
+              ],
+              throwOnReceiptRevert: true,
+            });
+            await holderClient.writeContractSync({
+              address: aaveBorrowConfig.takerPositionManager,
+              abi: mockAaveV4TakerPositionManagerAbi,
+              functionName: "approveBorrow",
+              args: [aaveBorrowConfig.spoke, aaveBorrowConfig.debtReserveId, strategy.adapter, balance],
+              throwOnReceiptRevert: true,
+            });
+          } else {
+            await approveSpender(holderClient, { strategy });
           }
-
-          await approveSpender(holderClient, { strategy });
 
           return json({ holder: holder.address });
         } finally {
