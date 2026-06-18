@@ -47,6 +47,11 @@ function getStrategyFromPath(): StrategyId {
   return window.location.pathname === "/money-market" ? "money-market" : "stablecoin";
 }
 
+function getIsAboutFromPath(): boolean {
+  const path = window.location.pathname;
+  return path === "/about" || path === "/";
+}
+
 function deserializeReceipt(receipt: SerializedReceipt): TransactionReceipt {
   return {
     blockHash: receipt.blockHash,
@@ -97,6 +102,7 @@ export function App() {
   const queryClient = useQueryClient();
   const initializedStrategies = useRef(new Set<StrategyId>());
   const [activeStrategyId, setActiveStrategyId] = useState<StrategyId>(getStrategyFromPath);
+  const [isAbout, setIsAbout] = useState<boolean>(getIsAboutFromPath);
   const [holders, setHolders] = useState<Partial<Record<StrategyId, Address>>>({});
   const [refreshingStrategyId, setRefreshingStrategyId] = useState<StrategyId | null>(null);
 
@@ -128,6 +134,7 @@ export function App() {
   useEffect(() => {
     function onPopState() {
       setActiveStrategyId(getStrategyFromPath());
+      setIsAbout(getIsAboutFromPath());
     }
 
     window.addEventListener("popstate", onPopState);
@@ -135,19 +142,25 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (holder || initializedStrategies.current.has(activeStrategyId)) return;
+    if (isAbout || holder || initializedStrategies.current.has(activeStrategyId)) return;
 
     initializedStrategies.current.add(activeStrategyId);
     setRefreshingStrategyId(activeStrategyId);
     refreshHolder.mutate(activeStrategyId);
     // `refreshHolder` is intentionally omitted: the mutation object is recreated
     // across renders, and including it can retrigger provisioning before a holder is set.
-  }, [activeStrategyId, holder]);
+  }, [activeStrategyId, holder, isAbout]);
 
   function navigate(strategyId: StrategyId) {
     const path = strategyId === "stablecoin" ? "/stablecoin" : "/money-market";
     window.history.pushState({}, "", path);
     setActiveStrategyId(strategyId);
+    setIsAbout(false);
+  }
+
+  function navigateToAbout() {
+    window.history.pushState({}, "", "/about");
+    setIsAbout(true);
   }
 
   function handleRefresh() {
@@ -171,11 +184,11 @@ export function App() {
           >
             Stablecoin Card Demo
           </a>
-          <nav className="flex gap-2" aria-label="Strategies">
+          <nav className="flex gap-2" aria-label="Pages">
             {strategyIds.map((strategyId) => (
               <a
                 className={`px-1 py-1.5 text-sm transition ${
-                  strategyId === activeStrategyId
+                  strategyId === activeStrategyId && !isAbout
                     ? "font-medium text-stone-950"
                     : "text-stone-500 hover:text-stone-950"
                 }`}
@@ -189,29 +202,191 @@ export function App() {
                 /{strategyId}
               </a>
             ))}
+            <a
+              className={`px-1 py-1.5 text-sm transition ${
+                isAbout ? "font-medium text-stone-950" : "text-stone-500 hover:text-stone-950"
+              }`}
+              href="/about"
+              onClick={(event) => {
+                event.preventDefault();
+                navigateToAbout();
+              }}
+            >
+              /about
+            </a>
           </nav>
         </div>
       </header>
 
       <section className="mx-auto max-w-5xl px-5 py-10">
-        <div className="mx-auto max-w-3xl space-y-8">
-          <CardholderPanel
-            error={refreshHolder.error ?? spendable.error}
-            holder={holder}
-            isRefreshing={isRefreshingActiveStrategy}
-            onRefresh={handleRefresh}
-            spendable={spendable.data}
-            spendableStatus={spendable.status}
-          />
-          <TransactionPanel
-            holder={holder}
-            onFinalized={() => queryClient.invalidateQueries({ queryKey: ["spendable", activeStrategyId, holder] })}
-            spendable={spendable.data}
-            strategyId={activeStrategyId}
-          />
-        </div>
+        {isAbout ? (
+          <AboutPage />
+        ) : (
+          <div className="mx-auto max-w-3xl space-y-8">
+            <CardholderPanel
+              error={refreshHolder.error ?? spendable.error}
+              holder={holder}
+              isRefreshing={isRefreshingActiveStrategy}
+              onRefresh={handleRefresh}
+              spendable={spendable.data}
+              spendableStatus={spendable.status}
+            />
+            <TransactionPanel
+              holder={holder}
+              onFinalized={() => queryClient.invalidateQueries({ queryKey: ["spendable", activeStrategyId, holder] })}
+              spendable={spendable.data}
+              strategyId={activeStrategyId}
+            />
+          </div>
+        )}
       </section>
     </main>
+  );
+}
+
+function AboutPage() {
+  const flowSteps = [
+    {
+      title: "Onboarding (once)",
+      detail: "The holder keeps stablecoins in their own wallet and approves the strategy's adapter.",
+    },
+    {
+      title: "Request",
+      detail: "A swipe travels POS → acquirer → network → issuer: holder H wants N.",
+    },
+    {
+      title: "Settle",
+      detail:
+        "The issuer calls settle on the adapter, pulling N from the holder's wallet to the acquirer. The attempt is the decision. If it can't pull, it reverts and the issuer answers no.",
+    },
+    {
+      title: "Finality",
+      detail:
+        "The issuer tracks the settle transaction to finality, waiting for two confirming blocks. Once final the movement is irreversible and the issuer answers yes.",
+    },
+  ];
+
+  const strategies = [
+    { name: "Stablecoin", holds: "the stablecoin itself", status: "Live" },
+    { name: "Money market", holds: "yield-bearing shares (ERC-4626 / aToken)", status: "Live" },
+    { name: "Swap", holds: "a different asset", status: "Planned" },
+  ];
+
+  const gasUsage = [
+    { label: "ERC-20 transfer()", note: undefined, gasPerPayment: 63_219, usd: "$0.000145" },
+    { label: "settle()", note: undefined, gasPerPayment: 69_706, usd: "$0.000160" },
+    { label: "settleBatch()", note: "batch of 10", gasPerPayment: 15_649, usd: "$0.00003599" },
+  ];
+  const maxGasPerPayment = Math.max(...gasUsage.map((operation) => operation.gasPerPayment));
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-10">
+      <section className="space-y-4">
+        <h1 className="text-2xl font-semibold tracking-tight">About</h1>
+        <p className="text-base leading-7 text-stone-700">
+          Monad enables simple on-chain settlement of card payments. It finalizes within the card
+          network's authorization window, and is both fast and cheap.
+        </p>
+        <p className="text-base leading-7 text-stone-700">
+          A cardholder keeps stablecoins in their existing wallet and uses the standard ERC-20{" "}
+          <code className="font-mono">approve</code> flow, and the card issuer pulls the funds at
+          payment time.
+        </p>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-stone-900">The flow</h2>
+        <p className="text-base leading-7 text-stone-700">
+          A card transaction reaches the issuer last (POS → acquirer → network → issuer), and the
+          issuer must answer the network yes or no within 3 seconds.
+        </p>
+        <ol className="space-y-3">
+          {flowSteps.map((step, index) => (
+            <li
+              className="flex gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3"
+              key={step.title}
+            >
+              <span className="text-base font-semibold text-stone-400">{index + 1}</span>
+              <div>
+                <p className="text-base font-medium text-stone-900">{step.title}</p>
+                <p className="mt-1 text-base leading-7 text-stone-600">{step.detail}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-stone-900">One interface, many strategies</h2>
+        <p className="text-base leading-7 text-stone-700">
+          Every strategy is an adapter: a single contract, deployed once and shared by all holders,
+          that implements balance recognition (<code className="font-mono">spendable</code>)
+          and settlement (<code className="font-mono">settle</code>). New payment assets,
+          yield sources, and settlement behaviors can be added over time without changing how
+          issuers integrate.
+        </p>
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <table className="w-full text-left text-base">
+            <thead className="border-b border-stone-200 text-stone-500">
+              <tr>
+                <th className="px-4 py-3 font-medium">Strategy</th>
+                <th className="px-4 py-3 font-medium">Holder holds</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {strategies.map((strategy) => (
+                <tr className="border-b border-stone-100 last:border-0" key={strategy.name}>
+                  <td className="px-4 py-3 font-medium text-stone-900">{strategy.name}</td>
+                  <td className="px-4 py-3 text-stone-600">{strategy.holds}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        strategy.status === "Live"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-stone-100 text-stone-500"
+                      }`}
+                    >
+                      {strategy.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold tracking-tight text-stone-900">Gas usage</h2>
+        <div className="space-y-5 rounded-xl border border-stone-200 bg-white p-5">
+          {gasUsage.map((operation) => (
+            <div key={operation.label}>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="flex items-baseline gap-2">
+                  <span className="font-mono text-sm text-stone-800">{operation.label}</span>
+                  {operation.note ? (
+                    <span className="text-xs text-stone-400">{operation.note}</span>
+                  ) : null}
+                </span>
+                <span className="text-sm text-stone-500">
+                  {operation.gasPerPayment.toLocaleString()} gas/payment · {operation.usd}
+                </span>
+              </div>
+              <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-100">
+                <div
+                  className="h-full rounded-full bg-stone-900"
+                  style={{ width: `${(operation.gasPerPayment / maxGasPerPayment) * 100}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-base leading-7 text-stone-700">
+          Measured against the stablecoin adapter at a 100 gwei gas price and $0.023 per MON.
+        </p>
+      </section>
+    </div>
   );
 }
 

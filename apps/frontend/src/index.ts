@@ -94,6 +94,7 @@ const server = Bun.serve({
     "/": index,
     "/stablecoin": index,
     "/money-market": index,
+    "/about": index,
     "/api/holders/:strategyId": {
       POST: (req) => handleError(async () => {
         const { strategyId } = req.params;
