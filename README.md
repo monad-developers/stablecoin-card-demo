@@ -61,8 +61,7 @@ stablecoin* — all behind the same `spendable` + `settle` surface.
 | Strategy | Holder holds | What it does | Status |
 | --- | --- | --- | --- |
 | **Stablecoin** | the stablecoin itself | `transferFrom` straight to the issuer. | ✅ |
-| **Money market** | yield-bearing shares (ERC-4626 / aToken) | pull shares, redeem to the underlying stablecoin, deliver it — funds earn yield until the instant of settlement. | ✅ |
-| **Swap** | a different asset | pull the asset, swap it to the stablecoin at settlement time, deliver it. | 🚧 Planned |
+| **Aave borrow** | collateral in Aave | borrow USDC against the holder's collateral at settlement time, then deliver it. | ✅ |
 
 ## Gas usage
 
@@ -81,10 +80,9 @@ This is a [Bun](https://bun.com) workspace monorepo.
 
 | Path | Package | Responsibility |
 | --- | --- | --- |
-| `packages/contracts` | `@stablecoin-card/contracts` | **Source of truth.** Solidity + Foundry. The `spendable` + `settle` adapter interface, the no-op stablecoin adapter, the money-market adapter, and (planned) the swap adapter, plus demo mocks. |
+| `packages/contracts` | `@stablecoin-card/contracts` | **Source of truth.** Solidity + Foundry. The `spendable` + `settle` adapter interface, the stablecoin adapter, the Aave borrow adapter, and demo mocks. |
 | `packages/sdk` | `@stablecoin-card/sdk` | **Integration layer.** Typesafe [viem](https://viem.sh) actions for approving an allowance, reading spendable balance, settling, and tracking a settlement to finality — for any TS consumer. |
 | `apps/stablecoin` | `@stablecoin-card/stablecoin` | **Stablecoin flow.** Setup and notebook scripts for direct ERC-20 settlement through `StablecoinAdapter`. |
-| `apps/money-market` | `@stablecoin-card/money-market` | **Money-market flow.** Setup and notebook scripts for yield-bearing receipt-token settlement through `MoneyMarketAdapter`. |
 | `apps/frontend` | `@stablecoin-card/frontend` | **Frontend app.** Bun + React + Tailwind workspace for building the demo UI. |
 
 ## Prerequisites
@@ -145,42 +143,6 @@ DEMO_ADAPTER_ADDRESS=...
 ```
 
 Add those printed addresses to `apps/stablecoin/.env`, then run the notebook flow:
-
-```bash
-bun notebook.ts
-```
-
-### Money-Market Flow
-
-This flow demonstrates yield-bearing settlement: the holder deposits USDC into `MockMoneyMarket`, approves `MoneyMarketAdapter`, and the issuer redeems receipt tokens at settlement time.
-
-Move to the money market directory:
-
-```bash
-cd apps/money-market
-```
-
-Prepare the app env file:
-
-```bash
-cp .env.example .env
-```
-
-Deploy mock USDC, deploy `MockMoneyMarket`, deploy `MoneyMarketAdapter`, deposit holder funds, and pre-fund market yield:
-
-```bash
-bun setup.ts
-```
-
-The setup command prints these values:
-
-```bash
-DEMO_MM_STABLECOIN_ADDRESS=...
-DEMO_MM_MONEY_MARKET_ADDRESS=...
-DEMO_MM_ADAPTER_ADDRESS=...
-```
-
-Add those printed addresses to `apps/money-market/.env`, then run the notebook flow:
 
 ```bash
 bun notebook.ts

@@ -4,20 +4,16 @@ import {
   createPublicClient,
   createWalletClient,
   encodeDeployData,
-  formatUnits,
   http,
-  parseUnits,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-import { erc20Abi } from "@stablecoin-card/sdk";
 import { demoChain, rpcUrl } from "./src/chain";
 
 const ARTIFACTS = `${import.meta.dir}/../../packages/contracts/out`;
 const TOKEN_DECIMALS = 18;
 const TOKEN_NAME = "USD Coin";
 const TOKEN_SYMBOL = "USDC";
-const YIELD_RESERVE = "500";
 const AAVE_DEBT_RESERVE_ID = 1n;
 const AAVE_BORROW_BUFFER_BPS = 9_000n;
 const AAVE_ORACLE_DECIMALS = 8;
@@ -58,8 +54,6 @@ async function main(): Promise<void> {
 
   const mockErc20 = await loadArtifact("MockERC20");
   const stablecoinAdapter = await loadArtifact("StablecoinAdapter");
-  const moneyMarketArtifact = await loadArtifact("MockMoneyMarket");
-  const moneyMarketAdapter = await loadArtifact("MoneyMarketAdapter");
   const aaveOracleArtifact = await loadArtifact("MockAaveV4Oracle");
   const aaveSpokeArtifact = await loadArtifact("MockAaveV4Spoke");
   const aaveTakerArtifact = await loadArtifact("MockAaveV4TakerPositionManager");
@@ -84,26 +78,6 @@ async function main(): Promise<void> {
     throwOnReceiptRevert: true,
   });
   if (!stablecoinAdapterAddress) throw new Error("StablecoinAdapter deployment produced no address");
-
-  const { contractAddress: moneyMarket } = await deployerClient.sendTransactionSync({
-    data: encodeDeployData({
-      abi: moneyMarketArtifact.abi,
-      bytecode: moneyMarketArtifact.bytecode,
-      args: [stablecoin],
-    }),
-    throwOnReceiptRevert: true,
-  });
-  if (!moneyMarket) throw new Error("MockMoneyMarket deployment produced no address");
-
-  const { contractAddress: moneyMarketAdapterAddress } = await deployerClient.sendTransactionSync({
-    data: encodeDeployData({
-      abi: moneyMarketAdapter.abi,
-      bytecode: moneyMarketAdapter.bytecode,
-      args: [issuer.address, moneyMarket],
-    }),
-    throwOnReceiptRevert: true,
-  });
-  if (!moneyMarketAdapterAddress) throw new Error("MoneyMarketAdapter deployment produced no address");
 
   const { contractAddress: aaveOracle } = await deployerClient.sendTransactionSync({
     data: encodeDeployData({
@@ -167,23 +141,10 @@ async function main(): Promise<void> {
   });
   if (!aaveAdapterAddress) throw new Error("AaveV4BorrowAdapter deployment produced no address");
 
-  const yieldReserve = parseUnits(YIELD_RESERVE, TOKEN_DECIMALS);
-  await deployerClient.writeContractSync({
-    address: stablecoin,
-    abi: erc20Abi,
-    functionName: "mint",
-    args: [moneyMarket, yieldReserve],
-    throwOnReceiptRevert: true,
-  });
-
-  console.log(`\nPrefunded money market yield reserve with ${formatUnits(yieldReserve, TOKEN_DECIMALS)} ${TOKEN_SYMBOL}`);
   console.log("\nAdd these values to apps/frontend/.env:");
   console.log(`BUN_PUBLIC_STABLECOIN_ADDRESS=${stablecoin}`);
   console.log(`BUN_PUBLIC_STABLECOIN_ASSET_ADDRESS=${stablecoin}`);
   console.log(`BUN_PUBLIC_STABLECOIN_ADAPTER_ADDRESS=${stablecoinAdapterAddress}`);
-  console.log(`BUN_PUBLIC_MM_STABLECOIN_ADDRESS=${stablecoin}`);
-  console.log(`BUN_PUBLIC_MM_MONEY_MARKET_ADDRESS=${moneyMarket}`);
-  console.log(`BUN_PUBLIC_MM_ADAPTER_ADDRESS=${moneyMarketAdapterAddress}`);
   console.log(`BUN_PUBLIC_AAVE_STABLECOIN_ADDRESS=${stablecoin}`);
   console.log(`BUN_PUBLIC_AAVE_ORACLE_ADDRESS=${aaveOracle}`);
   console.log(`BUN_PUBLIC_AAVE_SPOKE_ADDRESS=${aaveSpoke}`);

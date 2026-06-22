@@ -22,19 +22,6 @@ import { demoChain } from "./chain";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
-const moneyMarketAbi = [
-  {
-    type: "function",
-    name: "deposit",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
-    ],
-    outputs: [{ name: "shares", type: "uint256" }],
-  },
-] as const;
-
 const mockAaveV4SpokeAbi = [
   {
     type: "function",
@@ -127,9 +114,6 @@ const server = Bun.serve({
   port,
   routes: {
     "/": index,
-    "/stablecoin": index,
-    "/money-market": index,
-    "/aave-borrow": index,
     "/about": index,
     "/api/holders/:strategyId": {
       POST: (req) => handleError(async () => {
@@ -161,24 +145,7 @@ const server = Bun.serve({
             });
           }
 
-          if (strategyId === "money-market") {
-            await Bun.sleep(2_000);
-            await holderClient.writeContractSync({
-              address: strategy.stablecoin,
-              abi: erc20Abi,
-              functionName: "approve",
-              args: [strategy.asset, balance],
-              throwOnReceiptRevert: true,
-            });
-            await holderClient.writeContractSync({
-              address: strategy.asset,
-              abi: moneyMarketAbi,
-              functionName: "deposit",
-              args: [balance, holder.address],
-              throwOnReceiptRevert: true,
-            });
-            await approveSpender(holderClient, { strategy });
-          } else if (strategyId === "aave-borrow") {
+          if (strategyId === "aave-borrow") {
             await deployerClient.writeContractSync({
               address: aaveBorrowConfig.spoke,
               abi: mockAaveV4SpokeAbi,

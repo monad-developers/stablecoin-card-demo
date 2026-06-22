@@ -25,11 +25,6 @@ export const strategies: Record<StrategyId, DemoStrategy> = {
     asset: envAddress("BUN_PUBLIC_STABLECOIN_ASSET_ADDRESS", process.env.BUN_PUBLIC_STABLECOIN_ASSET_ADDRESS),
     adapter: envAddress("BUN_PUBLIC_STABLECOIN_ADAPTER_ADDRESS", process.env.BUN_PUBLIC_STABLECOIN_ADAPTER_ADDRESS),
   },
-  "money-market": {
-    stablecoin: envAddress("BUN_PUBLIC_MM_STABLECOIN_ADDRESS", process.env.BUN_PUBLIC_MM_STABLECOIN_ADDRESS),
-    asset: envAddress("BUN_PUBLIC_MM_MONEY_MARKET_ADDRESS", process.env.BUN_PUBLIC_MM_MONEY_MARKET_ADDRESS),
-    adapter: envAddress("BUN_PUBLIC_MM_ADAPTER_ADDRESS", process.env.BUN_PUBLIC_MM_ADAPTER_ADDRESS),
-  },
   "aave-borrow": {
     stablecoin: envAddress("BUN_PUBLIC_AAVE_STABLECOIN_ADDRESS", process.env.BUN_PUBLIC_AAVE_STABLECOIN_ADDRESS),
     asset: envAddress(

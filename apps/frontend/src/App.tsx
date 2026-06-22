@@ -21,6 +21,8 @@ import {
 } from "./demo";
 import { acquirer, rpcUrl, strategies } from "./config";
 import { demoChain } from "./chain";
+import monadLogo from "./monad.svg";
+import aaveLogo from "./aave.svg";
 
 type FlowStatus = "idle" | "running" | "complete";
 
@@ -43,16 +45,58 @@ const initialFlowSteps: FlowStep[] = [
 
 const monadScanBaseUrl = "https://testnet.monadscan.com";
 
-function getStrategyFromPath(): StrategyId {
-  const path = window.location.pathname;
-  if (path === "/money-market") return "money-market";
-  if (path === "/aave-borrow") return "aave-borrow";
-  return "stablecoin";
-}
-
 function getIsAboutFromPath(): boolean {
   const path = window.location.pathname;
-  return path === "/about" || path === "/";
+  return path === "/about";
+}
+
+const strategyLabels: Record<StrategyId, string> = {
+  stablecoin: "Stablecoin",
+  "aave-borrow": "Aave borrow",
+};
+
+const strategyDescriptions: Record<StrategyId, string> = {
+  stablecoin: "Holder authorizes direct settlement from their USDC balance.",
+  "aave-borrow": "Holder authorizes the adapter to borrow USDC against Aave collateral at settlement.",
+};
+
+const settleEvents: Record<StrategyId, string[]> = {
+  stablecoin: ["transfer USDC"],
+  "aave-borrow": ["check health factor", "originate loan", "transfer USDC"],
+};
+
+const aaveSettleCode = `function settle(address holder, uint256 amount, address recipient) external override {
+    if (msg.sender != issuer) revert NotIssuer();
+
+    uint256 available = spendable(holder);
+    if (amount > available) revert InsufficientSpendable(amount, available);
+
+    (, uint256 borrowed) = IAaveV4TakerPositionManager(takerPositionManager)
+        .borrowOnBehalfOf({
+            spoke: spoke,
+            reserveId: debtReserveId,
+            amount: amount,
+            onBehalfOf: holder
+        });
+    if (borrowed != amount) revert InsufficientBorrowed(amount, borrowed);
+
+    ERC20(stablecoin).safeTransfer(recipient, amount);
+
+    emit Settled(holder, recipient, amount);
+}`;
+
+const solidityTokenPattern =
+  /(\/\/.*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:contract|interface|function|external|override|public|view|pure|returns|return|address|uint256|uint16|uint8|bool|struct|calldata|memory|storage|immutable|constant|if|else|revert|require|emit|event|mapping)\b|\b\d+(?:_\d+)*(?:e\d+)?\b|[A-Za-z_]\w*(?=\())/g;
+
+function solidityTokenClass(token: string): string {
+  if (token.startsWith("//")) return "text-stone-500";
+  if (token.startsWith('"') || token.startsWith("'")) return "text-emerald-300";
+  if (/^\d/.test(token)) return "text-amber-300";
+  if (/^(address|uint256|uint16|uint8|bool|calldata|memory|storage)$/.test(token)) return "text-sky-300";
+  if (/^[A-Za-z_]\w*$/.test(token) && !/^(contract|interface|function|external|override|public|view|pure|returns|return|struct|immutable|constant|if|else|revert|require|emit|event|mapping)$/.test(token)) {
+    return "text-fuchsia-300";
+  }
+  return "text-violet-300";
 }
 
 function deserializeReceipt(receipt: SerializedReceipt): TransactionReceipt {
@@ -104,7 +148,7 @@ async function postJson<T>(url: string, body?: unknown): Promise<T> {
 export function App() {
   const queryClient = useQueryClient();
   const initializedStrategies = useRef(new Set<StrategyId>());
-  const [activeStrategyId, setActiveStrategyId] = useState<StrategyId>(getStrategyFromPath);
+  const [activeStrategyId, setActiveStrategyId] = useState<StrategyId>("stablecoin");
   const [isAbout, setIsAbout] = useState<boolean>(getIsAboutFromPath);
   const [holders, setHolders] = useState<Partial<Record<StrategyId, Address>>>({});
   const [refreshingStrategyId, setRefreshingStrategyId] = useState<StrategyId | null>(null);
@@ -136,7 +180,6 @@ export function App() {
 
   useEffect(() => {
     function onPopState() {
-      setActiveStrategyId(getStrategyFromPath());
       setIsAbout(getIsAboutFromPath());
     }
 
@@ -154,10 +197,8 @@ export function App() {
     // across renders, and including it can retrigger provisioning before a holder is set.
   }, [activeStrategyId, holder, isAbout]);
 
-  function navigate(strategyId: StrategyId) {
-    const path = `/${strategyId}`;
-    window.history.pushState({}, "", path);
-    setActiveStrategyId(strategyId);
+  function navigateToDemo() {
+    window.history.pushState({}, "", "/");
     setIsAbout(false);
   }
 
@@ -176,35 +217,25 @@ export function App() {
   return (
     <main className="min-h-screen bg-stone-50 text-stone-950">
       <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5">
           <a
-            className="text-sm font-semibold tracking-tight"
-            href="/stablecoin"
+            className="flex items-center gap-3 rounded-full transition hover:opacity-80"
+            href="/"
             onClick={(event) => {
               event.preventDefault();
-              navigate("stablecoin");
+              navigateToDemo();
             }}
+            aria-label="Monad x Aave demo"
           >
-            Stablecoin Card Demo
+            <span className="flex h-9 items-center rounded-full border border-stone-200 bg-white px-3 shadow-sm shadow-stone-200/60">
+              <img className="h-4 w-auto" src={monadLogo} alt="Monad" />
+            </span>
+            <span className="text-sm font-semibold text-stone-400">x</span>
+            <span className="flex h-9 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#B6509E] to-[#2EBAC6] shadow-sm shadow-stone-200/60">
+              <img className="h-5 w-auto" src={aaveLogo} alt="Aave" />
+            </span>
           </a>
           <nav className="flex gap-2" aria-label="Pages">
-            {strategyIds.map((strategyId) => (
-              <a
-                className={`px-1 py-1.5 text-sm transition ${
-                  strategyId === activeStrategyId && !isAbout
-                    ? "font-medium text-stone-950"
-                    : "text-stone-500 hover:text-stone-950"
-                }`}
-                href={`/${strategyId}`}
-                key={strategyId}
-                onClick={(event) => {
-                  event.preventDefault();
-                  navigate(strategyId);
-                }}
-              >
-                /{strategyId}
-              </a>
-            ))}
             <a
               className={`px-1 py-1.5 text-sm transition ${
                 isAbout ? "font-medium text-stone-950" : "text-stone-500 hover:text-stone-950"
@@ -223,9 +254,10 @@ export function App() {
 
       <section className="mx-auto max-w-5xl px-5 py-10">
         {isAbout ? (
-          <AboutPage />
+          <AboutPage onTryDemo={navigateToDemo} />
         ) : (
           <div className="mx-auto max-w-3xl space-y-8">
+            <StrategyPicker activeStrategyId={activeStrategyId} onChange={setActiveStrategyId} />
             <CardholderPanel
               error={refreshHolder.error ?? spendable.error}
               holder={holder}
@@ -247,33 +279,24 @@ export function App() {
   );
 }
 
-function AboutPage() {
-  const flowSteps = [
+function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
+  const settlementFlow = [
     {
-      title: "Onboarding (once)",
-      detail: "The holder keeps stablecoins in their own wallet and approves the strategy's adapter.",
+      title: "Issuer receives the card request",
+      detail: "A swipe travels POS -> acquirer -> network -> issuer. The issuer has only a few seconds to answer yes or no.",
     },
     {
-      title: "Request",
-      detail: "A swipe travels POS → acquirer → network → issuer: holder H wants N.",
+      title: "Issuer checks spendable value",
+      detail: "The settlement integration reports how much value the holder can spend, denominated in USDC.",
     },
     {
-      title: "Settle",
-      detail:
-        "The issuer calls settle on the adapter, pulling N from the holder's wallet to the acquirer. The attempt is the decision. If it can't pull, it reverts and the issuer answers no.",
+      title: "Settlement executes on-chain",
+      detail: "The integration performs the backing action and delivers USDC to the acquirer in one transaction.",
     },
     {
-      title: "Finality",
-      detail:
-        "The issuer tracks the settle transaction to finality, waiting for two confirming blocks. Once final the movement is irreversible and the issuer answers yes.",
+      title: "Finality closes authorization",
+      detail: "After the transaction and confirming blocks finalize, the issuer can answer yes with settlement already complete.",
     },
-  ];
-
-  const strategies = [
-    { name: "Stablecoin", holds: "the stablecoin itself", status: "Live" },
-    { name: "Money market", holds: "yield-bearing shares (ERC-4626 / aToken)", status: "Live" },
-    { name: "Aave borrow", holds: "collateral in Aave, borrowing USDC at settlement", status: "Live" },
-    { name: "Swap", holds: "a different asset", status: "Planned" },
   ];
 
   const gasUsage = [
@@ -284,28 +307,34 @@ function AboutPage() {
   const maxGasPerPayment = Math.max(...gasUsage.map((operation) => operation.gasPerPayment));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-10">
+    <div className="mx-auto max-w-3xl space-y-4">
       <section className="space-y-4">
-        <h1 className="text-2xl font-semibold tracking-tight">About</h1>
+        <div className="flex w-full items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight">About</h1>
+          <button
+            className="w-fit cursor-pointer rounded-xl bg-stone-950 px-5 py-3 text-sm font-medium text-white hover:bg-stone-800"
+            onClick={onTryDemo}
+            type="button"
+          >
+            Try the demo
+          </button>
+        </div>
+
         <p className="text-base leading-7 text-stone-700">
-          Monad enables simple on-chain settlement of card payments. It finalizes within the card
-          network's authorization window, and is both fast and cheap.
-        </p>
-        <p className="text-base leading-7 text-stone-700">
-          A cardholder keeps stablecoins in their existing wallet and uses the standard ERC-20{" "}
-          <code className="font-mono">approve</code> flow, and the card issuer pulls the funds at
-          payment time.
+          Card payments require a final yes or no inside the authorization window, but most crypto
+          payment flows split authorization and settlement into separate steps. This demo shows how
+          those steps can collapse into one on-chain action: if settlement finalizes, the issuer says yes.
         </p>
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight text-stone-900">The flow</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-stone-900">Stablecoin settlement</h2>
         <p className="text-base leading-7 text-stone-700">
-          A card transaction reaches the issuer last (POS → acquirer → network → issuer), and the
-          issuer must answer the network yes or no within 3 seconds.
+          Monad makes stablecoin settlement practical because the <strong>transaction can finalize inside the
+          card network's authorization window and costs less than $0.001</strong>.
         </p>
         <ol className="space-y-3">
-          {flowSteps.map((step, index) => (
+          {settlementFlow.map((step, index) => (
             <li
               className="flex gap-4 rounded-xl border border-stone-200 bg-white px-4 py-3"
               key={step.title}
@@ -321,43 +350,14 @@ function AboutPage() {
       </section>
 
       <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight text-stone-900">One interface, many strategies</h2>
+        <h2 className="text-lg font-semibold tracking-tight text-stone-900">Example: Aave borrow integration</h2>
         <p className="text-base leading-7 text-stone-700">
-          Every strategy is an adapter: a single contract, deployed once and shared by all holders,
-          that implements balance recognition (<code className="font-mono">spendable</code>)
-          and settlement (<code className="font-mono">settle</code>). New payment assets,
-          yield sources, and settlement behaviors can be added over time without changing how
-          issuers integrate.
+          Aave borrow is one concrete implementation. The holder keeps collateral in Aave, grants the
+          settlement contract borrow permission, and the issuer settles a card request by originating
+          USDC debt and sending the borrowed USDC to the acquirer.
         </p>
-        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-          <table className="w-full text-left text-base">
-            <thead className="border-b border-stone-200 text-stone-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">Strategy</th>
-                <th className="px-4 py-3 font-medium">Holder holds</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {strategies.map((strategy) => (
-                <tr className="border-b border-stone-100 last:border-0" key={strategy.name}>
-                  <td className="px-4 py-3 font-medium text-stone-900">{strategy.name}</td>
-                  <td className="px-4 py-3 text-stone-600">{strategy.holds}</td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        strategy.status === "Live"
-                          ? "bg-emerald-50 text-emerald-700"
-                          : "bg-stone-100 text-stone-500"
-                      }`}
-                    >
-                      {strategy.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <CodeBlock code={aaveSettleCode} language="solidity" />
         </div>
       </section>
 
@@ -391,6 +391,91 @@ function AboutPage() {
         </p>
       </section>
     </div>
+  );
+}
+
+function CodeBlock({ code, language }: { code: string; language: "solidity" }) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-stone-800 bg-stone-950">
+      <div className="flex items-center justify-between border-b border-stone-800 px-4 py-2">
+        <span className="text-xs font-medium text-stone-400">{language}</span>
+      </div>
+      <pre className="overflow-x-auto p-4 text-xs leading-6 text-stone-100">
+        <code>
+          {code.split("\n").map((line, lineIndex) => (
+            <span className="block" key={`${line}-${lineIndex}`}>
+              {highlightSolidity(line)}
+            </span>
+          ))}
+        </code>
+      </pre>
+    </div>
+  );
+}
+
+function highlightSolidity(line: string) {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+
+  for (const match of line.matchAll(solidityTokenPattern)) {
+    const token = match[0];
+    const index = match.index ?? 0;
+
+    if (index > lastIndex) parts.push(line.slice(lastIndex, index));
+    parts.push(
+      <span className={solidityTokenClass(token)} key={`${index}-${token}`}>
+        {token}
+      </span>,
+    );
+    lastIndex = index + token.length;
+  }
+
+  if (lastIndex < line.length) parts.push(line.slice(lastIndex));
+  return parts.length > 0 ? parts : "\u00A0";
+}
+
+function StrategyPicker({
+  activeStrategyId,
+  onChange,
+}: {
+  activeStrategyId: StrategyId;
+  onChange: (strategyId: StrategyId) => void;
+}) {
+  return (
+    <section className="rounded-3xl border border-stone-200 bg-white p-2 shadow-sm shadow-stone-200/60">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="px-3 py-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Card settlement demo</h1>
+          <p className="mt-1 min-h-12 text-sm leading-6 text-stone-600">{strategyDescriptions[activeStrategyId]}</p>
+        </div>
+        <div
+          className="grid grid-cols-2 rounded-2xl bg-stone-100 p-1 sm:w-80 sm:shrink-0"
+          role="radiogroup"
+          aria-label="Strategy"
+        >
+          {strategyIds.map((strategyId) => {
+            const isActive = strategyId === activeStrategyId;
+
+            return (
+              <button
+                className={`cursor-pointer rounded-xl px-4 py-3 text-center text-sm font-medium transition ${
+                  isActive
+                    ? "bg-white text-stone-950 shadow-sm ring-1 ring-stone-200"
+                    : "text-stone-500 hover:text-stone-950"
+                }`}
+                key={strategyId}
+                onClick={() => onChange(strategyId)}
+                role="radio"
+                aria-checked={isActive}
+                type="button"
+              >
+                {strategyLabels[strategyId]}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -552,53 +637,77 @@ function TransactionPanel({
           </div>
           <div className="flex items-center justify-between gap-4">
             <span className="text-stone-500">Acquirer</span>
-            <span className="break-all text-right font-mono text-xs">{acquirer}</span>
+            <span className="break-all text-right font-mono text-sm leading-6 text-stone-800">{acquirer}</span>
           </div>
         </div>
 
         <ol className="mt-6 space-y-3">
-          {steps.map((step, index) => (
-            <li
-              className={`flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-sm ${
-                step.status === "complete"
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-transparent bg-stone-100"
-              }`}
-              key={step.label}
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`w-4 text-sm font-medium ${
-                    step.status === "complete" ? "text-emerald-700" : "text-stone-400"
-                  }`}
-                >
-                  {step.status === "complete" ? "✓" : index + 1}
-                </span>
-                <span
-                  className={`font-medium ${
-                    step.status === "complete" ? "text-emerald-950" : "text-stone-800"
-                  }`}
-                >
-                  {step.label === "settle() transaction" ? (
-                    <>
-                      <code className="font-mono text-xs">settle()</code> transaction
-                    </>
-                  ) : (
-                    step.label
-                  )}
-                </span>
-              </div>
-              <span className={step.status === "complete" ? "text-emerald-700" : "text-stone-500"}>
-                {step.status === "running"
-                  ? "Running"
-                  : step.durationMs
-                    ? `${Math.round(step.durationMs)}ms`
-                    : flowStatus === "idle"
-                      ? ""
-                      : "Pending"}
-              </span>
-            </li>
-          ))}
+          {steps.map((step, index) => {
+            const showSettleEvents = step.label === "settle() transaction" && step.status === "complete";
+
+            return (
+              <li
+                className={`rounded-xl border px-4 py-3 text-sm ${
+                  step.status === "complete"
+                    ? "border-emerald-200 bg-emerald-50"
+                    : "border-transparent bg-stone-100"
+                }`}
+                key={step.label}
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`w-4 text-sm font-medium ${
+                        step.status === "complete" ? "text-emerald-700" : "text-stone-400"
+                      }`}
+                    >
+                      {step.status === "complete" ? "✓" : index + 1}
+                    </span>
+                    <span
+                      className={`font-medium ${
+                        step.status === "complete" ? "text-emerald-950" : "text-stone-800"
+                      }`}
+                    >
+                      {step.label === "settle() transaction" ? (
+                        <>
+                          <code className="font-mono text-xs">settle()</code> transaction
+                        </>
+                      ) : (
+                        step.label
+                      )}
+                    </span>
+                  </div>
+                  <span className={step.status === "complete" ? "text-emerald-700" : "text-stone-500"}>
+                    {step.status === "running"
+                      ? "Running"
+                      : step.durationMs
+                        ? `${Math.round(step.durationMs)}ms`
+                        : flowStatus === "idle"
+                          ? ""
+                          : "Pending"}
+                  </span>
+                </div>
+                {showSettleEvents ? (
+                  <div className="mt-3 border-t border-emerald-200/80 pt-3 pl-7">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-emerald-700">Events</p>
+                    <ul className="flex flex-wrap gap-2">
+                      {settleEvents[strategyId].map((event) => (
+                        <li
+                          className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-emerald-950 shadow-sm shadow-emerald-950/5"
+                          key={event}
+                        >
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100 text-[10px] leading-none text-emerald-700">
+                            ✓
+                          </span>
+                          <span>{event}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </li>
+            );
+          })}
         </ol>
 
         {settleReceipt ? (
