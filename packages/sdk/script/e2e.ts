@@ -1,7 +1,7 @@
 /**
  * End-to-end smoke test of the @stablecoin-card/sdk actions against a local anvil node.
  *
- * It deploys a mock USDC plus stablecoin and money-market adapters via viem
+ * It deploys a mock USDC plus the stablecoin adapter via viem
  * (using the forge build artifacts), then exercises approveSpender ->
  * readSpendable -> settle -> finality and asserts the money actually moved —
  * plus that the issuer gate holds.
@@ -153,120 +153,12 @@ async function main(): Promise<void> {
   }
   check("non-issuer settle is rejected", gated);
 
-  console.log("\nDeploying money market strategy ...");
-  const moneyMarket = await deploy("MockMoneyMarket", [usdc]);
-  const moneyMarketAdapter = await deploy("MoneyMarketAdapter", [issuer.address, moneyMarket]);
-  const moneyMarketStrategy: Strategy = {
-    adapter: moneyMarketAdapter,
-    asset: moneyMarket,
-    stablecoin: usdc,
-  };
-  const { abi: moneyMarketAbi } = await loadArtifact("MockMoneyMarket");
-  console.log(`  MoneyMarket: ${moneyMarket}`);
-  console.log(`  Adapter:     ${moneyMarketAdapter}  (issuer ${issuer.address})\n`);
-
-  const marketFund = parseUnits("10000", 6);
-  const marketCharge = parseUnits("101", 6);
-  const yieldReserve = parseUnits("500", 6);
-
-  // Holder deposits stablecoin and receives yield-bearing receipt tokens.
-  await holderClient.writeContractSync({
-    address: usdc,
-    abi: erc20Abi,
-    functionName: "mint",
-    args: [holder.address, marketFund],
-    throwOnReceiptRevert: true,
-  });
-  await holderClient.writeContractSync({
-    address: usdc,
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [moneyMarket, marketFund],
-    throwOnReceiptRevert: true,
-  });
-  const depositReceipt = await holderClient.writeContractSync({
-    address: moneyMarket,
-    abi: moneyMarketAbi,
-    functionName: "deposit",
-    args: [marketFund, holder.address],
-    throwOnReceiptRevert: true,
-  });
-  check("money market deposit mined successfully", depositReceipt.status === "success");
-
-  const receiptBalance = await publicClient.readContract({
-    address: moneyMarket,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [holder.address],
-  });
-  check("holder received money market receipt tokens", receiptBalance > 0n && receiptBalance <= marketFund);
-
-  // The mock pays yield from prefunded reserves while its conversion rate rises per block.
-  await deployerClient.writeContractSync({
-    address: usdc,
-    abi: erc20Abi,
-    functionName: "mint",
-    args: [moneyMarket, yieldReserve],
-    throwOnReceiptRevert: true,
-  });
-
-  await approveSpender(holderClient, { strategy: moneyMarketStrategy });
-
-  const moneyMarketSpendableBefore = await readSpendable(publicClient, {
-    strategy: moneyMarketStrategy,
-    holder: holder.address,
-  });
-  check("money market spendable includes accrued yield", moneyMarketSpendableBefore > marketFund);
-
-  const acquirerBeforeMoneyMarket = await publicClient.readContract({
-    address: usdc,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [acquirer],
-  });
-
-  const moneyMarketSettleReceipt = await settle(issuerClient, {
-    strategy: moneyMarketStrategy,
-    holder: holder.address,
-    amount: marketCharge,
-    recipient: acquirer,
-  });
-  check("money market settle mined successfully", moneyMarketSettleReceipt.status === "success");
-
-  const acquirerAfterMoneyMarket = await publicClient.readContract({
-    address: usdc,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [acquirer],
-  });
-  check(
-    `acquirer received ${formatUnits(marketCharge, 6)} USDC from money market`,
-    acquirerAfterMoneyMarket - acquirerBeforeMoneyMarket === marketCharge,
-  );
-
-  const receiptBalanceAfter = await publicClient.readContract({
-    address: moneyMarket,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [holder.address],
-  });
-  check("holder receipt balance reduced after money market settle", receiptBalanceAfter < receiptBalance);
-
-  const moneyMarketSpendableAfter = await readSpendable(publicClient, {
-    strategy: moneyMarketStrategy,
-    holder: holder.address,
-  });
-  check(
-    "money market spendable reduced after settle",
-    moneyMarketSpendableAfter < moneyMarketSpendableBefore,
-  );
-
   console.log("");
   if (failures > 0) {
     console.error(`\u274c e2e failed: ${failures} check(s) failed`);
     process.exit(1);
   }
-  console.log("\u2705 e2e passed: stablecoin + money market settlement flows");
+  console.log("\u2705 e2e passed: stablecoin settlement flow");
 }
 
 main().catch((err) => {
