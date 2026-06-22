@@ -47,7 +47,7 @@ const monadScanBaseUrl = "https://testnet.monadscan.com";
 
 function getIsAboutFromPath(): boolean {
   const path = window.location.pathname;
-  return path === "/about";
+  return path === "/" || path === "/about";
 }
 
 const strategyLabels: Record<StrategyId, string> = {
@@ -198,7 +198,7 @@ export function App() {
   }, [activeStrategyId, holder, isAbout]);
 
   function navigateToDemo() {
-    window.history.pushState({}, "", "/");
+    window.history.pushState({}, "", "/demo");
     setIsAbout(false);
   }
 
@@ -220,10 +220,10 @@ export function App() {
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-5 py-5">
           <a
             className="flex items-center gap-3 rounded-full transition hover:opacity-80"
-            href="/"
+            href="/about"
             onClick={(event) => {
               event.preventDefault();
-              navigateToDemo();
+              navigateToAbout();
             }}
             aria-label="Monad x Aave demo"
           >
