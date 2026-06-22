@@ -72,6 +72,7 @@ const aaveSettleCode = `function settle(address holder, uint256 amount, address 
     if (amount > available) revert InsufficientSpendable(amount, available);
 
     (, uint256 borrowed) = IAaveV4TakerPositionManager(takerPositionManager)
+        // Aave checks the holder's health factor and reverts if the borrow would breach it
         .borrowOnBehalfOf({
             spoke: spoke,
             reserveId: debtReserveId,
