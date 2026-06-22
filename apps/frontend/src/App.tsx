@@ -321,9 +321,43 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
         </div>
 
         <p className="text-base leading-7 text-stone-700">
-          Card payments require a final yes or no inside the authorization window, but most crypto
-          payment flows split authorization and settlement into separate steps. This demo shows how
-          those steps can collapse into one on-chain action: if settlement finalizes, the issuer says yes.
+          Stablecoin-backed card transactions are exploding, but a few structural issues still stand
+          between today's products and the next level.
+        </p>
+
+        <ul className="list-disc space-y-2 pl-5 text-base leading-7 text-stone-700">
+          <li>
+            <strong>Tight authorization windows.</strong> Card networks like Visa require a final yes
+            or no in under ~1.5 seconds, so issuers need a hard guarantee that a transaction is fully
+            settled — not just submitted.
+          </li>
+          <li>
+            <strong>Spend is capped to idle balances.</strong> To avoid double-spends, issuers can
+            only authorize against funds already confirmed in a user's wallet, so balances locked in
+            DeFi — collateral, yield — can't be spent.
+          </li>
+          <li>
+            <strong>Slow finality forces issuers to float.</strong> Legacy chains can't finalize
+            inside that window, so issuers front the funds and absorb settlement risk, which raises
+            cost and caps what they can offer.
+          </li>
+        </ul>
+
+        <p className="text-base leading-7 text-stone-700">
+          Monad and Aave have been working together to mitigate all of these issues and bring forward
+          a new era of card products that earn more yield, settle faster, reduce float requirements,
+          and increase what's possible.
+        </p>
+
+        <p className="text-base leading-7 text-stone-700">
+          By combining Monad's performance and sub-second finality with Aave's deep liquidity, card
+          issuers and apps can now let users spend their balance directly from DeFi and finalize
+          transactions in around one second — meeting the obligations of card networks like Visa.
+        </p>
+
+        <p className="text-base leading-7 text-stone-700">
+          This is a demo to showcase how the contract is written and how card issuers can unlock a new
+          experience without introducing risk or additional costs.
         </p>
       </section>
 
