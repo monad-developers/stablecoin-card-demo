@@ -4,10 +4,24 @@ A reference implementation of an **on-chain settlement mechanism for card paymen
 
 A cardholder keeps stablecoins **in their own wallet**, grants a shared **settlement adapter** an **allowance**, the same ERC-20 `approve` every wallet already speaks, and the issuer settles through that adapter at payment time. There is no custodial account to fund and no per-holder permission system: the authorization *is* the allowance, settlement *is* a `transferFrom`, and the adapter is deployed **once per strategy** and shared by every holder.
 
-**Monad's fast, deterministic finality lets settlement finalize inside the card network's authorization window**. It combines traditional authorization and settlement into one action, eliminating inventory risk from double spend.
+**Monad's fast, deterministic finality lets settlement finalize inside the card network's authorization window**, collapsing authorization and settlement into one on-chain action and eliminating inventory risk from double spend. Strategy adapters go further — Aave borrow lets a holder spend against collateral that keeps earning yield, instead of idle balances.
 
 > [!WARNING]
 > **This is a demo, not for production use.**
+
+## The problem
+
+Stablecoin-backed card spend is growing fast, but a few structural issues hold it back:
+
+- **Tight authorization windows.** Card networks like Visa require a final yes or no in
+  under ~1.5 seconds, so issuers need a hard guarantee that a transaction is fully settled —
+  not just submitted.
+- **Spend is capped to idle balances.** To avoid double-spends, issuers can only authorize
+  against funds already confirmed in a holder's wallet, so balances earning yield in DeFi
+  can't be spent.
+- **Slow finality forces issuers to float.** Legacy chains can't finalize inside that window,
+  so issuers front the funds and absorb settlement risk — raising cost and capping what they
+  can offer.
 
 ## Flow
 
@@ -61,7 +75,7 @@ stablecoin* — all behind the same `spendable` + `settle` surface.
 | Strategy | Holder holds | What it does | Status |
 | --- | --- | --- | --- |
 | **Stablecoin** | the stablecoin itself | `transferFrom` straight to the issuer. | ✅ |
-| **Aave borrow** | collateral in Aave | borrow USDC against the holder's collateral at settlement time, then deliver it. | ✅ |
+| **Aave borrow** | yield-earning collateral in Aave | borrow USDC against the holder's collateral at settlement time, then deliver it. | ✅ |
 
 ## Gas usage
 
