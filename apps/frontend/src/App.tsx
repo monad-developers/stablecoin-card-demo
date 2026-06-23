@@ -226,10 +226,10 @@ export function App() {
               event.preventDefault();
               navigateToAbout();
             }}
-            aria-label="Monad x Aave demo"
+            aria-label="Monad Foundation x Aave demo"
           >
             <span className="flex h-9 items-center rounded-full border border-stone-200 bg-white px-3 shadow-sm shadow-stone-200/60">
-              <img className="h-4 w-auto" src={monadLogo} alt="Monad" />
+              <img className="h-4 w-auto" src={monadLogo} alt="Monad Foundation" />
             </span>
             <span className="text-sm font-semibold text-stone-400">x</span>
             <span className="flex h-9 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#B6509E] to-[#2EBAC6] shadow-sm shadow-stone-200/60">
@@ -322,8 +322,8 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
         </div>
 
         <p className="text-base leading-7 text-stone-700">
-          Stablecoin-backed card transactions are exploding, but a few structural issues still stand
-          between today's products and the next level.
+          Stablecoin-backed card transactions are growing fast, but a few structural issues still stand
+          between today's products and what's next.
         </p>
 
         <ul className="list-disc space-y-2 pl-5 text-base leading-7 text-stone-700">
@@ -345,9 +345,8 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
         </ul>
 
         <p className="text-base leading-7 text-stone-700">
-          Monad and Aave have been working together to mitigate all of these issues and bring forward
-          a new era of card products that earn more yield, settle faster, reduce float requirements,
-          and increase what's possible.
+          Monad Foundation and Aave have been working together on an open-source toolkit to mitigate
+          these issues and help enable a new era of card products that settle faster and increase what's possible.
         </p>
 
         <p className="text-base leading-7 text-stone-700">
@@ -357,8 +356,9 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
         </p>
 
         <p className="text-base leading-7 text-stone-700">
-          This is a demo to showcase how the contract is written and how card issuers can unlock a new
-          experience without introducing risk or additional costs.
+          This page is a live demo and reference implementation: it shows how the settlement contracts
+          are written and how card issuers can unlock this experience without introducing new risk or
+          additional cost.
         </p>
       </section>
 
@@ -425,6 +425,15 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
           Measured against the stablecoin adapter at a 100 gwei gas price and $0.023 per MON.
         </p>
       </section>
+
+      <footer className="rounded-xl border border-amber-300 bg-amber-50 p-5">
+        <p className="text-sm font-semibold text-amber-900">Warning</p>
+        <p className="mt-1 text-sm leading-6 text-amber-800">
+          This is a reference implementation for educational purposes and has not been audited. It may
+          have significant errors and security vulnerabilities. Do not use the code in this example in a
+          production environment without completing your own audits and application of best practices.
+        </p>
+      </footer>
     </div>
   );
 }

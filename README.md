@@ -7,7 +7,7 @@ A cardholder keeps stablecoins **in their own wallet**, grants a shared **settle
 **Monad's fast, deterministic finality lets settlement finalize inside the card network's authorization window**, collapsing authorization and settlement into one on-chain action and eliminating inventory risk from double spend. Strategy adapters go further — Aave borrow lets a holder spend against collateral that keeps earning yield, instead of idle balances.
 
 > [!WARNING]
-> **This is a demo, not for production use.**
+> This is a reference implementation for educational purposes and has not been audited. It may have significant errors and security vulnerabilities. Do not use the code in this example in a production environment without completing your own audits and application of best practices.
 
 ## The problem
 
