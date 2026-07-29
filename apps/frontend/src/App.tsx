@@ -350,9 +350,9 @@ function AboutPage({ onTryDemo }: { onTryDemo: () => void }) {
         </p>
 
         <p className="text-base leading-7 text-stone-700">
-          By combining Monad's performance and sub-second finality with Aave's deep liquidity, card
+          By combining Monad's performance with Aave's deep liquidity, card
           issuers and apps can now let users spend their balance directly from DeFi and finalize
-          transactions in around one second — meeting the obligations of card networks like Visa.
+          transactions in around 600 milliseconds — meeting the obligations of card networks like Visa.
         </p>
 
         <p className="text-base leading-7 text-stone-700">
