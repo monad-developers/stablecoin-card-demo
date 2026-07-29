@@ -8,7 +8,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-import { demoChain, rpcUrl } from "./src/chain";
+import { demoChain, rpcUrls } from "./src/chain";
 
 const ARTIFACTS = `${import.meta.dir}/../../packages/contracts/out`;
 const TOKEN_DECIMALS = 18;
@@ -44,11 +44,12 @@ async function main(): Promise<void> {
   const deployer = privateKeyToAccount(envPrivateKey("DEMO_DEPLOYER_PRIVATE_KEY"));
   const issuer = privateKeyToAccount(envPrivateKey("DEMO_ISSUER_PRIVATE_KEY"));
 
-  const publicClient = createPublicClient({ chain: demoChain, transport: http(rpcUrl), pollingInterval: 200 });
-  const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: http(rpcUrl) });
+  const rpcTransports = rpcUrls.map((url) => http(url));
+  const publicClient = createPublicClient({ chain: demoChain, transport: rpcTransports[0]!, pollingInterval: 200 });
+  const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: rpcTransports[0]! });
 
   const chainId = await publicClient.getChainId();
-  console.log(`Deploying frontend demo contracts to ${rpcUrl} (chain ${chainId})`);
+  console.log(`Deploying frontend demo contracts to ${rpcUrls.join(", ")} (chain ${chainId})`);
   console.log(`  deployer: ${deployer.address}`);
   console.log(`  issuer:   ${issuer.address}`);
 
