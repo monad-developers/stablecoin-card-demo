@@ -2,13 +2,16 @@ import index from "./index.html";
 import {
   type Address,
   type Hex,
+  type TransactionReceipt,
+  createPublicClient,
   createWalletClient,
+  encodeFunctionData,
   http,
   parseEther,
   parseUnits,
 } from "viem";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
-import { approveSpender, erc20Abi, settle } from "@stablecoin-card/sdk";
+import { approveSpender, erc20Abi, settlementAdapterAbi } from "@stablecoin-card/sdk";
 
 import {
   DEFAULT_HOLDER_BALANCE,
@@ -17,8 +20,9 @@ import {
   type SerializedReceipt,
   isStrategyId,
 } from "./demo";
-import { acquirer, aaveBorrowConfig, rpcUrl, strategies } from "./config";
+import { acquirer, aaveBorrowConfig, rpcUrls, strategies } from "./config";
 import { demoChain } from "./chain";
+import { firstSettled } from "./rpc";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 
@@ -85,7 +89,7 @@ async function acquireWriterLock(): Promise<() => void> {
   return release;
 }
 
-function serializeReceipt(receipt: Awaited<ReturnType<typeof settle>>): SerializedReceipt {
+function serializeReceipt(receipt: TransactionReceipt): SerializedReceipt {
   if (!receipt.blockHash) throw new Error("Settlement receipt has no block hash");
 
   return {
@@ -107,8 +111,10 @@ async function handleError(fn: () => Promise<Response>): Promise<Response> {
 
 const deployer = privateKeyToAccount(envPrivateKey("DEMO_DEPLOYER_PRIVATE_KEY"));
 const issuer = privateKeyToAccount(envPrivateKey("DEMO_ISSUER_PRIVATE_KEY"));
-const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: http(rpcUrl) });
-const issuerClient = createWalletClient({ account: issuer, chain: demoChain, transport: http(rpcUrl) });
+const rpcTransports = rpcUrls.map((url) => http(url));
+const submissionClients = rpcTransports.map((transport) => createPublicClient({ chain: demoChain, transport }));
+const deployerClient = createWalletClient({ account: deployer, chain: demoChain, transport: rpcTransports[0]! });
+const issuerClient = createWalletClient({ account: issuer, chain: demoChain, transport: rpcTransports[0]! });
 
 const server = Bun.serve({
   port,
@@ -125,7 +131,7 @@ const server = Bun.serve({
         try {
           const privateKey = generatePrivateKey();
           const holder = privateKeyToAccount(privateKey);
-          const holderClient = createWalletClient({ account: holder, chain: demoChain, transport: http(rpcUrl) });
+          const holderClient = createWalletClient({ account: holder, chain: demoChain, transport: rpcTransports[0]! });
           const strategy = strategies[strategyId];
           const balance = parseUnits(DEFAULT_HOLDER_BALANCE, TOKEN_DECIMALS);
 
@@ -186,12 +192,21 @@ const server = Bun.serve({
 
         const releaseWriter = await acquireWriterLock();
         try {
-          const receipt = await settle(issuerClient, {
-            strategy: strategies[strategyId],
-            holder,
-            amount: parseUnits(SETTLEMENT_AMOUNT, TOKEN_DECIMALS),
-            recipient: acquirer,
+          const request = await issuerClient.prepareTransactionRequest({
+            to: strategies[strategyId].adapter,
+            data: encodeFunctionData({
+              abi: settlementAdapterAbi,
+              functionName: "settle",
+              args: [holder, parseUnits(SETTLEMENT_AMOUNT, TOKEN_DECIMALS), acquirer],
+            }),
           });
+          const serializedTransaction = await issuerClient.signTransaction(request);
+          const receipt = await firstSettled(
+            submissionClients.map((client) => client.sendRawTransactionSync({
+              serializedTransaction,
+              throwOnReceiptRevert: true,
+            })),
+          );
 
           return json({ receipt: serializeReceipt(receipt) });
         } finally {

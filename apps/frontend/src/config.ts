@@ -1,7 +1,7 @@
 import type { Address } from "viem";
 
 import type { DemoStrategy, StrategyId } from "./demo";
-export { rpcUrl } from "./chain";
+export { rpcUrls } from "./chain";
 
 function requiredValue(name: string, value: string | undefined): string {
   if (!value) throw new Error(`Missing ${name} in apps/frontend/.env`);

@@ -19,7 +19,7 @@ import {
   type StrategyId,
   strategyIds,
 } from "./demo";
-import { acquirer, rpcUrl, strategies } from "./config";
+import { acquirer, rpcUrls, strategies } from "./config";
 import { demoChain } from "./chain";
 import monadLogo from "./monad.svg";
 import aaveLogo from "./aave.svg";
@@ -34,7 +34,7 @@ type FlowStep = {
 
 const publicClient = createPublicClient({
   chain: demoChain,
-  transport: http(rpcUrl),
+  transport: http(rpcUrls[0]),
   pollingInterval: 200,
 });
 

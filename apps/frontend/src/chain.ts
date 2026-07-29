@@ -12,6 +12,12 @@ function requiredNumber(name: string, value: string | undefined): number {
   return parsed;
 }
 
+function requiredList(name: string, value: string | undefined): string[] {
+  const values = requiredValue(name, value).split(",").map((item) => item.trim());
+  if (values.some((item) => !item)) throw new Error(`${name} must be a comma-separated list`);
+  return values;
+}
+
 function defaultChainName(chainId: number): string {
   if (chainId === 10_143) return "Monad Testnet";
   if (chainId === 31_337) return "Local Anvil";
@@ -19,7 +25,7 @@ function defaultChainName(chainId: number): string {
 }
 
 export const chainId = requiredNumber("BUN_PUBLIC_CHAIN_ID", process.env.BUN_PUBLIC_CHAIN_ID);
-export const rpcUrl = requiredValue("BUN_PUBLIC_RPC_URL", process.env.BUN_PUBLIC_RPC_URL);
+export const rpcUrls = requiredList("BUN_PUBLIC_RPC_URL", process.env.BUN_PUBLIC_RPC_URL);
 export const chainName = defaultChainName(chainId);
 
 export const demoChain = defineChain({
@@ -32,7 +38,7 @@ export const demoChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [rpcUrl],
+      http: rpcUrls,
     },
   },
 });
